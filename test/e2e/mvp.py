@@ -14,11 +14,13 @@ import json
 import os
 from pathlib import Path
 import secrets
+import signal
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -78,7 +80,10 @@ def main():
     parser.add_argument("--fixture-port", type=int, default=18090)
     parser.add_argument("--timer-delay", type=int, default=45)
     parser.add_argument("--state-dir", type=Path)
+    parser.add_argument("--console", action="store_true", help="after the fake gate, retain the isolated service for manual browser QA until Enter")
     args = parser.parse_args()
+    if args.console and (args.mode != "fake" or not os.getenv("BOTS_CONSOLE_TEST_TOKEN")):
+        parser.error("--console requires --mode fake and BOTS_CONSOLE_TEST_TOKEN for the isolated test installation")
     args.chronotope = args.chronotope.resolve()
     state_dir = args.state_dir or Path(tempfile.mkdtemp(prefix="bots-mvp-"))
     state_dir = state_dir.resolve()
@@ -120,18 +125,20 @@ def main():
         prior[name] = dict(v.split("=", 1) for v in raw_env)
     modified = {"API_AUTH_MODE", "API_ADMIN_KEY", "APPLICATION_SERVICE_TOKEN", "APPLICATION_BRIDGES_JSON", "APPLICATION_TIMER_TARGETS_JSON", "HARNESS_FAKE_MODEL", "LITELLM_BASE_URL", "LITELLM_MASTER_KEY"}
     checks, restarted = [], False
+    before_timer_admission_crash_verified = False
+    timer_admission_crash_before, timer_admission_crash_after = None, None
     fixture, application = None, None
     log = open(state_dir / "processes.log", "ab")
     app_env = env.copy()
     try:
-        fixture = subprocess.Popen([sys.executable, str(ROOT / "test/fixtures/model-channel.py"), "--port", str(args.fixture_port), "--db", str(state_dir / "fixture.sqlite")], stdout=log, stderr=log)
+        fixture = subprocess.Popen([sys.executable, str(ROOT / "test/fixtures/model-channel.py"), "--port", str(args.fixture_port), "--db", str(state_dir / "fixture.sqlite"), "--runtime-api", args.api], stdout=log, stderr=log)
         wait_for("fixture health", lambda: request(fixture_url, "/healthz"))
         subprocess.run(compose + ["up", "-d", "--no-build", "--no-deps", "api", "worker", "harness"], cwd=args.chronotope, env=env, check=True, stdout=log, stderr=log)
         wait_for("Chronotope health", lambda: request(args.api, "/healthz"))
         wait_for("worker registration", lambda: request("http://127.0.0.1:9070", "/deployments", {"uri": "http://worker:9080", "force": True, "use_http_11": True}, expected=(200, 201, 202)))
         app_env["BOTS_CHRONOTOPE_TOKEN"] = request(args.api, f"/orgs/{tenant}/keys", {}, token=env["API_ADMIN_KEY"], expected=(201,))["key"]
-        app_env.update(BOTS_ADMIN_TOKEN=secrets.token_hex(24), SLACK_BOT_TOKEN="test-only-sink-token", SLACK_SIGNING_SECRET=secrets.token_hex(24),
-            BOTS_DATABASE_URL=args.database_url, BOTS_HTTP_ADDR=f"0.0.0.0:{args.bots_port}", BOTS_CHRONOTOPE_URL=args.api,
+        app_env.update(BOTS_ADMIN_TOKEN=os.environ["BOTS_CONSOLE_TEST_TOKEN"] if args.console else secrets.token_hex(24), SLACK_BOT_TOKEN="test-only-sink-token", SLACK_SIGNING_SECRET=secrets.token_hex(24),
+            BOTS_DATABASE_URL=args.database_url, BOTS_HTTP_ADDR=f"0.0.0.0:{args.bots_port}", BOTS_CHRONOTOPE_URL=fixture_url + "/runtime" if args.mode == "fake" else args.api,
             BOTS_SLACK_API_URL=fixture_url + "/api", BOTS_POLL_INTERVAL="100ms", BOTS_SEED_PATH=str(state_dir / "bot.yaml"),
             BOTS_RUNTIME_TOKEN_ENV="BOTS_CHRONOTOPE_TOKEN", BOTS_ADMIN_TOKEN_ENV="BOTS_ADMIN_TOKEN", BOTS_INTERNAL_TOKEN_ENV="APPLICATION_SERVICE_TOKEN")
         seed = {"tenant_id": tenant, "id": bot, "name": "G0 native team bot", "enabled": True, "account_enabled": True,
@@ -234,6 +241,76 @@ def main():
         identity, task = knowledge[0]["id"], tasks[0]
         assert knowledge[0]["content"] == "G0 native knowledge: team review is Friday" and knowledge[0]["kind"] == "knowledge"
         assert task["text"] == "G0 native reminder: team review"
+        if args.mode == "fake":
+            # Only the transport boundary is held. Both native tool commits and
+            # the final model/provider receipt already exist in the real stack.
+            def intercepted_timer():
+                proxy = state()["runtime_timer_proxy"]
+                return proxy if proxy["blocked_attempts"] > 0 else None
+
+            held = wait_for("timer admission intercepted before actual runtime", intercepted_timer)
+            assert held["blocked"] is True and held["forwarded_attempts"] == 0 and held["accepted_attempts"] == 0
+            assert all(attempt["blocked"] is True and attempt["status"] == 503 for attempt in held["requests"])
+            before_task = records("tasks")[0]
+            assert before_task["status"] == "pending_schedule" and not before_task["timer_handle"]
+            assert before_task["id"] == task["id"] and before_task["timer_id"] == task["timer_id"]
+            assert before_task["revision"] == task["revision"]
+            timer_request = held["requests"][0]["body"]
+            timer_identity = {"tenant_id": tenant, "subject_ref": bot, "scope_id": scope,
+                              "timer_id": before_task["timer_id"], "revision": before_task["revision"],
+                              "opaque_action_ref": before_task["id"]}
+            assert set(timer_request) == set(timer_identity) | {"due_at"}
+            assert all(timer_request[key] == value for key, value in timer_identity.items())
+            assert dt.datetime.fromisoformat(timer_request["due_at"].replace("Z", "+00:00")) == due
+            assert dt.datetime.fromisoformat(before_task["due_at"].replace("Z", "+00:00")) == due
+            timer_request_hash = hashlib.sha256(json.dumps(timer_request, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+            assert all(attempt["body"] == timer_request and attempt["request_hash"] == timer_request_hash for attempt in held["requests"])
+            timer_query = urllib.parse.urlencode({key: timer_identity[key] for key in ("tenant_id", "subject_ref", "scope_id", "revision")})
+            timer_path = "/timers/" + urllib.parse.quote(timer_identity["timer_id"], safe="") + "?" + timer_query
+            # Bypass /runtime entirely: a proxy-local 404 would not prove the
+            # real Chronotope timer has not yet been admitted.
+            request(args.api, timer_path, token=app_env["BOTS_CHRONOTOPE_TOKEN"], expected=(404,))
+            admission_runtime_before = runtime_snapshot()
+            admission_models_before = len(state()["models"])
+            assert admission_models_before == 2 and admission_runtime_before["llm_call_count"] > 0
+            assert application.poll() is None, "Bots exited before the admission crash"
+            killed = application
+            timer_admission_crash_before = {"bots_pid": killed.pid, "task": before_task,
+                "actual_runtime_get_status": 404, "timer_request": timer_request, "timer_request_hash": timer_request_hash,
+                "runtime_timer_proxy": held, "model_http_requests": admission_models_before,
+                "runtime_calls": admission_runtime_before}
+            stop(killed, crash=True)
+            assert killed.returncode == -signal.SIGKILL, "Bots did not exit from the requested OS SIGKILL"
+            application = None
+            request(fixture_url, "/control/runtime-timers", {"blocked": False})
+            application = start_app()
+            assert application.pid != killed.pid
+            wait_for("same durable task repaired after admission crash", lambda: records("tasks")[0]["timer_handle"])
+            repaired_tasks, repaired_knowledge = records("tasks"), records("knowledge")
+            assert len(repaired_tasks) == 1 and len(repaired_knowledge) == 1
+            repaired = repaired_tasks[0]
+            assert repaired_knowledge[0] == knowledge[0], "knowledge changed during outbox repair"
+            for key in ("id", "tenant_id", "bot_id", "scope_id", "origin_command_id", "reminder_slot", "text", "due_at", "revision", "timer_id", "target", "created_at"):
+                assert repaired[key] == before_task[key], "timer repair changed task " + key
+            assert repaired["status"] == "scheduled" and repaired["timer_handle"]
+            actual_timer = request(args.api, timer_path, token=app_env["BOTS_CHRONOTOPE_TOKEN"])
+            assert all(actual_timer[key] == value for key, value in timer_identity.items())
+            assert dt.datetime.fromisoformat(actual_timer["due_at"].replace("Z", "+00:00")) == due
+            assert actual_timer["timer_handle"] == repaired["timer_handle"] and actual_timer["fire_id"]
+            admitted = state()["runtime_timer_proxy"]
+            assert admitted["blocked"] is False and admitted["accepted_attempts"] > 0
+            assert all(attempt["body"] == timer_request and attempt["request_hash"] == timer_request_hash for attempt in admitted["requests"])
+            admission_runtime_after = runtime_snapshot()
+            admission_models_after = len(state()["models"])
+            assert admission_runtime_after == admission_runtime_before, "timer outbox repair dispatched new runtime model work"
+            assert admission_models_after == admission_models_before, "timer outbox repair repeated model HTTP inference"
+            timer_admission_crash_after = {"bots_pid": application.pid, "killed_bots_pid": killed.pid,
+                "killed_bots_exit_code": killed.returncode, "task": repaired, "actual_runtime_get_status": 200,
+                "actual_runtime_timer": actual_timer, "timer_request_hash": timer_request_hash,
+                "runtime_timer_proxy": admitted, "model_http_requests": admission_models_after,
+                "runtime_calls": admission_runtime_after}
+            before_timer_admission_crash_verified = True
+            passed("Bots OS SIGKILL before timer admission -> same PG task/timer/revision/request repaired; actual API 404 -> handle, no model replay")
         wait_for("durable timer acceptance", lambda: records("tasks")[0]["timer_handle"])
         passed("ten signed source retries -> one native knowledge/task/final delivery")
         if args.mode == "fake":
@@ -282,12 +359,18 @@ def main():
         assert len(runs) == 2
         passed("new runtime session after process restart recalls same scoped native knowledge and source")
         report = {"mode": args.mode, "real_channel": False, "tenant": tenant, "bot": bot, "scope": scope,
-                  "checks": checks, "restart_verified": restarted, "task": records("tasks")[0], "deliveries": records("deliveries"),
+                  "checks": checks, "restart_verified": restarted,
+                  "before_timer_admission_crash_verified": before_timer_admission_crash_verified,
+                  "timer_admission_crash_before": timer_admission_crash_before, "timer_admission_crash_after": timer_admission_crash_after,
+                  "task": records("tasks")[0], "deliveries": records("deliveries"),
                   "knowledge_id": identity, "sleep": invocation,
                   "model_http_requests": len(state()["models"]) if args.mode == "fake" else None,
                   "runtime_calls_before_wait": before_wait_runtime, "runtime_calls_while_paused": paused_runtime,
                   "runtime_calls_after_resume": resumed_runtime, "runtime_calls_after_recall": runtime_snapshot(), "audit": audit}
         (state_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        if args.console:
+            print("Isolated console: " + base + "/admin (use BOTS_CONSOLE_TEST_TOKEN; Enter stops services and restores the prior stack)", flush=True)
+            input()
     finally:
         stop(application)
         stop(fixture)

@@ -3,14 +3,20 @@
 
 Real Bots owns its PG inbox, tools, knowledge, tasks, fire and delivery records.
 This fixture only records model requests and provider calls for gate assertions.
+Its fixed-upstream /runtime proxy can hold timer admission before the real API;
+only timer request bodies/hashes/counters are observed, never auth or Bots state.
 """
 import argparse
 import datetime as dt
+import hashlib
 import json
 import re
 import sqlite3
 import threading
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -58,9 +64,17 @@ def validate_tools(body):
 
 
 class Fixture:
-    def __init__(self, path):
+    def __init__(self, path, runtime_api):
         self.path = path
         self.lock = threading.Lock()
+        parsed = urllib.parse.urlsplit(runtime_api)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc or parsed.username is not None or parsed.query or parsed.fragment:
+            raise ValueError("runtime upstream must be a fixed HTTP API address")
+        self.runtime_api = runtime_api.rstrip("/")
+        self.block_timers = True
+        # Test traffic observations stay in memory; the real Bots database is
+        # the only owner of task/outbox state and survives the process kills.
+        self.timer_requests = []
         with self.db() as db:
             db.executescript("""
               PRAGMA journal_mode=WAL;
@@ -134,9 +148,32 @@ class Fixture:
         return {"ok": True, "channel": body["channel"], "ts": timestamp}
 
     def state(self):
+        with self.lock:
+            requests = json.loads(encoded(self.timer_requests))
+            proxy = {"blocked": self.block_timers, "requests": requests,
+                     "blocked_attempts": sum(row["blocked"] for row in requests),
+                     "forwarded_attempts": sum(not row["blocked"] for row in requests),
+                     "accepted_attempts": sum(row["status"] == 202 for row in requests)}
         with self.db() as db:
             return {"models": [dict(r) for r in db.execute("SELECT * FROM models ORDER BY id")],
-                    "sends": [dict(r) for r in db.execute("SELECT * FROM sends ORDER BY id")]}
+                    "sends": [dict(r) for r in db.execute("SELECT * FROM sends ORDER BY id")],
+                    "runtime_timer_proxy": proxy}
+
+    def observe_timer(self, raw):
+        body = json.loads(raw)
+        if not isinstance(body, dict):
+            raise ValueError("timer request must be a JSON object")
+        with self.lock:
+            index = len(self.timer_requests)
+            blocked = self.block_timers
+            self.timer_requests.append({"body": body, "request_hash": hashlib.sha256(encoded(body).encode()).hexdigest(),
+                                        "blocked": blocked, "status": 503 if blocked else None})
+            return index, blocked
+
+
+class NoRuntimeRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -147,15 +184,55 @@ class Handler(BaseHTTPRequestHandler):
 
     def reply(self, status, body):
         payload = encoded(body).encode()
+        return self.reply_raw(status, payload, {"Content-Type": "application/json"})
+
+    def reply_raw(self, status, payload, headers):
         self.send_response(status)
-        self.send_header("Content-Type", "application/json")
+        for name, value in headers.items():
+            self.send_header(name, value)
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(payload)
         self.close_connection = True
 
+    def runtime_path(self):
+        return self.path == "/runtime" or self.path.startswith("/runtime/")
+
+    def proxy_runtime(self, raw=None):
+        fixture = self.server.fixture
+        suffix = self.path[len("/runtime"):] or "/"
+        timer_index = None
+        if self.command == "POST" and urllib.parse.urlsplit(suffix).path == "/timers":
+            timer_index, blocked = fixture.observe_timer(raw)
+            if blocked:
+                return self.reply(503, {"code": 503, "error": "test proxy is holding timer admission"})
+        # The upstream is constructor configuration. Concatenation deliberately
+        # avoids urljoin accepting a caller-supplied absolute or scheme-less URL.
+        headers = {name: self.headers[name] for name in ("Authorization", "Idempotency-Key", "Accept", "Content-Type") if name in self.headers}
+        upstream = urllib.request.Request(fixture.runtime_api + suffix, data=raw, headers=headers, method=self.command)
+        opener = urllib.request.build_opener(NoRuntimeRedirect())
+        try:
+            try:
+                response = opener.open(upstream, timeout=10)
+            except urllib.error.HTTPError as exc:
+                response = exc
+            with response:
+                status = response.status
+                payload = response.read((1 << 20) + 1)
+                returned = {name: response.headers[name] for name in ("Content-Type", "Retry-After", "Location") if name in response.headers}
+            if len(payload) > 1 << 20:
+                raise OSError("runtime response exceeds fixture limit")
+        except (OSError, urllib.error.URLError):
+            status, payload, returned = 502, b'{"code":502,"error":"runtime proxy response unconfirmed"}', {"Content-Type": "application/json"}
+        if timer_index is not None:
+            with fixture.lock:
+                fixture.timer_requests[timer_index]["status"] = status
+        return self.reply_raw(status, payload, returned)
+
     def do_GET(self):
+        if self.runtime_path():
+            return self.proxy_runtime()
         if self.path == "/healthz":
             return self.reply(200, {"test_fixture": True})
         if self.path == "/state":
@@ -165,9 +242,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= 1 << 20:
+            if not 0 <= length <= 1 << 20:
                 return self.reply(400, {"error": "invalid length"})
-            body = json.loads(self.rfile.read(length))
+            raw = self.rfile.read(length)
+            if self.runtime_path():
+                return self.proxy_runtime(raw)
+            body = json.loads(raw)
+            if self.path == "/control/runtime-timers":
+                if set(body) != {"blocked"} or type(body["blocked"]) is not bool:
+                    return self.reply(400, {"error": "blocked must be an explicit boolean"})
+                with self.server.fixture.lock:
+                    self.server.fixture.block_timers = body["blocked"]
+                return self.reply(200, {"blocked": body["blocked"]})
             if self.path == "/api/chat.postMessage":
                 return self.reply(200, self.server.fixture.send(body))
             if self.path != "/v1/chat/completions":
@@ -194,8 +280,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=18090)
     parser.add_argument("--db", required=True)
+    parser.add_argument("--runtime-api", required=True, help="fixed actual Chronotope API for the transparent /runtime proxy")
     args = parser.parse_args()
     server = ThreadingHTTPServer(("0.0.0.0", args.port), Handler)
     server.daemon_threads = True
-    server.fixture = Fixture(args.db)
+    server.fixture = Fixture(args.db, args.runtime_api)
     server.serve_forever(poll_interval=0.2)
