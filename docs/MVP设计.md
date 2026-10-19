@@ -61,6 +61,10 @@ session 映射唯一键是 `tenant/bot/installation/channel/thread`，**不含�
 
 首版用 Go HTTP 服务，进程内分 api、slack、tools、store、dispatcher；数据库使各后台 poller 可恢复。没有独立 scheduler、队列服务或多个业务微服务。
 
+实现以一个 tenant 一个活跃 dispatcher 为部署约束，用 PG session advisory lock 防止重复启动及并发恢复。消息目标、知识范围和回执使用渠道无关字段，首个可运行 adapter 仍为用户选定的 Slack 免费自建 Bot；不提前扩展多渠道平台。
+
+首次导入后固定账号身份、频道、凭据引用和 bridge/timer 部署绑定；在线配置只修改人格/SOP、模型、时区和限额。凭据值可按原引用轮换。当前不支持在途账号切换，避免 sender claim 后使用新账号执行旧责任；需要新绑定时创建新 Bot 或执行明确的开发重建。
+
 | 记录 | 必须保留的字段/责任 |
 |---|---|
 | bots | org_id/bot_id、enabled、人格/SOP/工具能力/预算配置、revision/hash、runtime_agent_id、Slack workspace/bot identity 与 secret refs；PG 是导入后配置权威，账号先嵌配置 |
@@ -105,7 +109,7 @@ flowchart LR
 
 ### 4.2 Slack 接纳、排队和终态读取
 
-1. 校验签名/时间、installation→tenant/bot 绑定与事件类型；先提交 inbox，再按 Slack 期限 ACK。相同 source event 去重。
+1. 校验签名/时间、installation→tenant/bot 绑定与事件类型；先提交 inbox，再按 Slack 期限 ACK。Slack 的 `event_id` 是投递 ID，逻辑来源按 `installation/channel/message_ts` 生成 canonical message ID；`message` 与 `app_mention` 订阅交叉投递同一消息时共用该 ID，不产生第二个命令。编辑/删除仍按原始 message timestamp 关联来源并失效。
 2. 同 thread 串行消费；忙时输入留在 PG 队列，不因 `session active` 丢弃或标永久失败。简单 poller 足够，不先实现完整 actor/mailbox/signals。
 3. 用稳定 command ID 调 Chronotope；run/command/outbox 同事务接纳，直接 `202`。幂等查询先于 active-run 冲突判断，同 ID 异请求拒绝。
 4. Bots 持久保存 run handle，轮询受权的 `GET /runs/{id}` 读取 canonical status/final/error/usage；终态与 final/error 同一提交后可见，不出现 completed 但结果尚未保存的窗口。SSE 不是正确性的唯一来源。
