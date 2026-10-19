@@ -11,6 +11,22 @@ permissions:
 jobs:
   go:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bots_test
+          POSTGRES_PASSWORD: bots_test
+          POSTGRES_DB: bots_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U bots_test -d bots_test"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+    env:
+      BOTS_TEST_DATABASE_URL: postgres://bots_test:bots_test@localhost:5432/bots_test?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -18,3 +34,4 @@ jobs:
           go-version-file: go.mod
           cache: false
       - run: make check
+      - run: go test -race ./...

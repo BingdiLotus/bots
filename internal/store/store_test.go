@@ -518,3 +518,134 @@ func TestConfigurationCannotSwitchDeploymentIdentity(t *testing.T) {
 		t.Fatalf("old immutable snapshot changed: %+v %s %v", old, agent, err)
 	}
 }
+
+func TestPendingQuotaIncludesUnknownAndBlockedWithoutChargingSlotRetries(t *testing.T) {
+	for _, status := range []string{"unknown", "blocked"} {
+		t.Run(status, func(t *testing.T) {
+			f := setupPG(t)
+			ctx := t.Context()
+			cfg := f.bot.Config
+			cfg.MaxPendingTasks = 1
+			if _, err := f.s.UpdateConfig(ctx, f.tenant, "bot", 1, cfg, "quota-agent"); err != nil {
+				t.Fatal(err)
+			}
+			args := map[string]any{"due_at": time.Now().Add(time.Minute).UTC().Truncate(time.Microsecond), "text": "one logical reminder"}
+			original := f.call(t, "quota-create", "create_reminder", args)
+			id := taskID(t, original)
+			task, err := f.s.GetTask(ctx, f.scope, id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.fire(t, task)
+			delivery, err := f.s.ClaimDelivery(ctx, f.tenant)
+			if err != nil {
+				t.Fatal(err)
+			}
+			outcome := "unknown"
+			if status == "blocked" {
+				outcome = "rejected"
+			}
+			if err := f.s.FailDelivery(ctx, delivery.ID, delivery.PayloadHash, outcome, "fixture outcome", time.Time{}); err != nil {
+				t.Fatal(err)
+			}
+			current, err := f.s.GetTask(ctx, f.scope, id)
+			if err != nil || current.Status != status {
+				t.Fatalf("task did not retain %s responsibility: %+v %v", status, current, err)
+			}
+			// Both RPC replay and a new call for the same origin slot remain one
+			// task, even though its unresolved responsibility consumes all quota.
+			if replay := f.call(t, "quota-create", "create_reminder", args); domain.Hash(replay) != domain.Hash(original) {
+				t.Fatalf("original creation receipt changed: %s / %s", original, replay)
+			}
+			if replayID := taskID(t, f.call(t, "same-slot", "create_reminder", args)); replayID != id {
+				t.Fatal("same origin slot charged a second task")
+			}
+			if err := f.s.FinishRun(ctx, f.inbox.ID, domain.RunResult{Status: "completed", Final: "done"}); err != nil {
+				t.Fatal(err)
+			}
+			f.inbox = f.startInput(t, "second-origin", "second-thread", "second-run")
+			refused := f.call(t, "over-quota", "create_reminder", map[string]any{"due_at": task.DueAt.Add(time.Minute), "text": "second logical reminder"})
+			if !strings.Contains(string(refused), "pending_task_limit") {
+				t.Fatalf("%s responsibility released its quota: %s", status, refused)
+			}
+			tasks, err := f.s.ListTasks(ctx, f.scope, 20)
+			if err != nil || len(tasks) != 1 || tasks[0].ID != id || tasks[0].Status != status {
+				t.Fatalf("quota refusal mutated existing responsibility: %+v %v", tasks, err)
+			}
+		})
+	}
+}
+
+func TestSuccessfulCancelResponseLossReplaysAndFencesOldFire(t *testing.T) {
+	f := setupPG(t)
+	ctx := t.Context()
+	task := f.createTask(t)
+	args := map[string]any{"task_id": task.ID, "expected_revision": task.Revision}
+	original := f.call(t, "cancel-once", "cancel_reminder", args)
+	var canceled struct {
+		Revision int    `json:"revision"`
+		Status   string `json:"status"`
+	}
+	if err := json.Unmarshal(original, &canceled); err != nil || canceled.Revision != 2 || canceled.Status != "canceled" {
+		t.Fatalf("cancel did not commit: %s %v", original, err)
+	}
+	if retry := f.call(t, "cancel-once", "cancel_reminder", args); domain.Hash(retry) != domain.Hash(original) {
+		t.Fatalf("response-loss retry became a revision conflict: %s / %s", original, retry)
+	}
+	f.fire(t, task)
+	if _, err := f.s.ClaimDelivery(ctx, f.tenant); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("old fire obtained send claim after cancellation: %v", err)
+	}
+	deliveries, err := f.s.ListDeliveries(ctx, f.scope, 20)
+	if err != nil || len(deliveries) != 0 {
+		t.Fatalf("old revision produced delivery responsibility: %+v %v", deliveries, err)
+	}
+	current, err := f.s.GetTask(ctx, f.scope, task.ID)
+	if err != nil || current.Status != "canceled" || current.Revision != 2 {
+		t.Fatalf("old fire changed canceled task: %+v %v", current, err)
+	}
+	var count int
+	if err := f.s.Pool.QueryRow(ctx, `SELECT count(*) FROM bots.audit_events WHERE tenant_id=$1 AND kind='cancel_reminder'`, f.tenant).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("cancel replay duplicated mutation audit: %d %v", count, err)
+	}
+}
+
+func TestDisabledAccountBlocksNewWorkButReplaysOriginalOperation(t *testing.T) {
+	f := setupPG(t)
+	ctx := t.Context()
+	args := map[string]string{"content": "known result before account disabled", "kind": "knowledge"}
+	original := f.call(t, "learn-before-disable", "remember", args)
+	task := f.createTask(t)
+	f.fire(t, task)
+	if err := f.s.SetAccountEnabled(ctx, f.tenant, "bot", false); err != nil {
+		t.Fatal(err)
+	}
+	if replay := f.call(t, "learn-before-disable", "remember", args); domain.Hash(replay) != domain.Hash(original) {
+		t.Fatalf("account disable erased known operation receipt: %s / %s", original, replay)
+	}
+	_, err := f.s.ExecuteTool(ctx, domain.ToolCall{Context: domain.ToolContext{TenantID: f.tenant, SubjectRef: "bot", ScopeID: f.scope.ScopeID, OriginCommandID: f.inbox.CommandID, RunID: f.inbox.RunID, OperationID: "new-write", ToolCallID: "new-write"}, ToolRef: "remember", Arguments: raw(map[string]string{"content": "must not be written", "kind": "knowledge"})})
+	if !errors.Is(err, domain.ErrDisabled) {
+		t.Fatalf("disabled account accepted new native tool: %v", err)
+	}
+	if _, _, err := f.s.AcceptInbox(ctx, domain.Inbox{TenantID: f.tenant, BotID: "bot", Namespace: "slack", SourceID: "disabled-event", Input: "new request", Target: f.inbox.Target}); !errors.Is(err, domain.ErrDisabled) {
+		t.Fatalf("disabled account accepted new inbox: %v", err)
+	}
+	if _, err := f.s.ClaimDelivery(ctx, f.tenant); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("disabled account obtained send claim: %v", err)
+	}
+	knowledge, err := f.s.ListKnowledge(ctx, f.scope, 20)
+	if err != nil || len(knowledge) != 1 || knowledge[0].Content != args["content"] {
+		t.Fatalf("disabled operation mutated knowledge: %+v %v", knowledge, err)
+	}
+	deliveries, err := f.s.ListDeliveries(ctx, f.scope, 20)
+	if err != nil || len(deliveries) != 1 || deliveries[0].State != "pending" || deliveries[0].Attempts != 0 {
+		t.Fatalf("disabled sender changed pending responsibility: %+v %v", deliveries, err)
+	}
+	if err := f.s.SetAccountEnabled(ctx, f.tenant, "bot", true); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := f.s.ClaimDelivery(ctx, f.tenant)
+	if err != nil || resumed.ID != deliveries[0].ID || resumed.TaskID != task.ID {
+		t.Fatalf("re-enable did not resume the original delivery: %+v %v", resumed, err)
+	}
+}
