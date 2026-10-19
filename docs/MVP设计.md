@@ -137,7 +137,7 @@ flowchart LR
 
 Chronotope 增加/替换通用接口 `POST /timers`：稳定 `timer_id/revision/due_at/opaque_action_ref`，持久接纳后 `202`；同 key 同 payload 返回原 handle，异 payload 冲突。固定回调目标来自服务配置，不能由模型传任意 URL；timer 不解释 Slack 或 BotTask。
 
-Bots pending command poller 修复“Task 已提交、timer 未提交”；提交使用同一 timer key。Chronotope 用可重放的时间/初始剩余时长和 Restate Sleep 等待，已经过期则立即投递 fire。Bots **先持久接纳 fire/创建 delivery 后 ACK**，按稳定 fire ID 去重；Bot 暂停时也接纳 fire，只阻断后续发送 claim，避免唤醒丢失。timer fired 不等于 task 完成。
+Bots pending command poller 修复“Task 已提交、timer 未提交”；提交使用同一 timer key。Chronotope 创建 Restate Sleep 前按绝对 due_at 计算当下剩余时长，已创建的 Sleep 保留 journal 中的原唤醒时刻；已经过期则立即投递 fire。Bots **先持久接纳 fire/创建 delivery 后 ACK**，按稳定 fire ID 去重；Bot 暂停时也接纳 fire，只阻断后续发送 claim，避免唤醒丢失。timer fired 不等于 task 完成。
 
 timer 更新可建新 revision 对应 invocation；取消以 Bots task revision/status 为最终门，旧 timer 到达只记录 ignored，不产生新发送。主动取消底层 Sleep 是资源优化，不是正确性前提。**Bots 不再另建一条扫描到期任务并直接发送的竞争调度路径。**
 
