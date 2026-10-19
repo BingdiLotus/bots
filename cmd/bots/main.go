@@ -49,7 +49,9 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	defer cancelStartup()
 	db, err := store.Open(startupCtx, cfg.DatabaseURL)
 	if err != nil {
-		return fmt.Errorf("open Bots database: %w", err)
+		// A driver's parse/connection error can contain the credential-bearing
+		// DSN. Startup logs identify the setting without echoing that value.
+		return fmt.Errorf("open Bots database: check BOTS_DATABASE_URL and database connectivity")
 	}
 	defer db.Close()
 	if err := db.Bootstrap(startupCtx); err != nil {
