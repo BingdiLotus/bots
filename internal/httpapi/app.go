@@ -46,6 +46,7 @@ type App struct {
 }
 
 func (a *App) Register(mux *http.ServeMux) {
+	a.registerConsole(mux)
 	mux.HandleFunc("POST /internal/tools", a.executeTool)
 	mux.HandleFunc("POST /internal/timer-fires", a.acceptTimerFire)
 	mux.HandleFunc("GET /api/tenants/{tenant}/bots", a.listBots)
