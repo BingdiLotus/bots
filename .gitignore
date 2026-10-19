@@ -5,3 +5,6 @@
 !.env.example
 *.log
 .DS_Store
+/configs/bot.yaml
+__pycache__/
+*.pyc
