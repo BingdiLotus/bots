@@ -1,0 +1,9 @@
+.git
+bin
+docs
+README.md
+.env
+.env.*
+*.log
+coverage.out
+.DS_Store
