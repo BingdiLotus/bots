@@ -51,7 +51,15 @@ docs/                  产品设计与研究
 
 下一里程碑只验证一个组织 Bot、一个 Slack 账号、一个 harness：**记住信息 → 自建提醒 → 等待中重启 → 发送并保存真实回执**。
 
-- [MVP 设计与实施入口](./docs/MVP设计.md)
-- [本地 Chronotope 期 8 方案](../chronotope/docs/期8-细化落地方案.md)
+| 文档 | 权威范围 |
+|---|---|
+| [MVP 实施方案](./docs/MVP设计.md) | 唯一产品主路径、八类记录、五个工具、G0/G1/G2 与实施验收 |
+| [Chronotope 集成与职责边界](./docs/Chronotope与Bingdi-Bots职责边界.md) | Bots、执行 infra 与外部应用逐对象分权 |
+| [持久身份与非模型 RSI](./docs/持久Agent身份与非模型RSI设计.md) | 原生资产/工作与后续改进能力，非 MVP 全量前置 |
+| [承诺原语](./docs/承诺原语设计.md) | 原生责任的历史依据/后续设计；MVP 先用 Task 字段 |
+| [工业产品调研](./docs/工业产品调研-持久Agent与托管运行平台-2026-10.md) | Tag、Managed Agents、Agents API/SDK、dots、Grok、Muse、Cue |
+| [前沿研究](./docs/前沿调研-持久Agent与非模型自改进-2026-10.md) | 知识/技能、协作与非模型改进的证据和限制 |
 
-允许重建开发数据和破坏性接口调整。第一版不建设旧数据迁移、协议兼容、多 Agent、应用市场或完整 RSI 发布平台。
+文档已从 Chronotope 迁入本仓库，不再在两边保存完整产品设计。Chronotope 仅维护[运行时期 8](../chronotope/docs/期8-细化落地方案.md)和[应用接入契约](../chronotope/docs/应用接入契约.md)。跨仓库相对链接使用本地 `BingdiLotus/{bots,chronotope}` 并列布局；线上从 [Chronotope 仓库](https://github.com/BingdiLotus/chronotope)导航。
+
+两个项目均未上生产，允许破坏性 API/schema 调整与开发全栈重建。初始化不包含成员聊天产品、完整业务功能或生产上线。
