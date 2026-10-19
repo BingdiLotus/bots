@@ -4,6 +4,8 @@
 
 当前实现了知识与提醒的 MVP 主链：验签入站、持久 inbox、五个原生工具、Chronotope 有限 run/耐久 timer、唯一 sender、回执/unknown 台账及管理员 API。G0 已使用真实 Bots 进程、PG 与 Chronotope 栈验证；真实 Slack 安装验收仍待配置。仓库：[BingdiLotus/bots](https://github.com/BingdiLotus/bots)。阶段状态与证据见[开发进展](docs/MVP开发进展.md)。
 
+管理员可通过 `/admin` 管理工作配置、启停、知识、任务、回执和审计。页面直接嵌入 Go 服务；成员仍在 Slack 中与 Bot 交互。管理页与一次 SOP 改进的完整验收分别记录，尚未用界面可用替代实际改进结果。
+
 ## 本地运行
 
 需要 Go 1.26.0 或更高版本，以及已启用租户认证的 Chronotope 栈。先按[运行与验收](docs/运行与验收.md)配置 seed、PG、服务认证和 Slack 免费自建 App；普通 Bot 不依赖 Slack 内置 AI 订阅。
@@ -46,7 +48,7 @@ make build
 
 参见 [.env.example](./.env.example)。服务不自动读取 `.env`，需由 shell/部署环境导出。seed 仅存凭据引用；后台 sender 才解析实际渠道 token，模型不能指定频道或回调地址。
 
-已提供 [Dockerfile](./Dockerfile) 和含 PostgreSQL 事务测试的 [CI](./.github/workflows/ci.yml)。本机 `make check` 及 G0 通过；当前容器构建/真实 Slack 验收状态以开发进展为准。
+已提供 [Dockerfile](./Dockerfile) 和含 PostgreSQL 事务测试的 [CI](./.github/workflows/ci.yml)。本机 `make check`、G0、真实模型＋sink、管理页浏览器 QA 及容器构建/只读 smoke 通过；真实 Slack 与完整 SOP 改进仍待验收，详见开发进展。
 
 ## 代码与设计入口
 
