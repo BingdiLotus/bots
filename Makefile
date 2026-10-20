@@ -23,6 +23,7 @@ fmt-check:
 
 scripts-check:
 	@for file in scripts/*.sh; do sh -n "$$file"; done
+	@python3 -m py_compile test/lab/drive.py
 	@python3 -m py_compile test/sop/*.py
 
 check: fmt-check vet test build scripts-check
