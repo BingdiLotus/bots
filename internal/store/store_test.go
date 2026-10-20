@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/bingdilotus/bots/internal/domain"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type fixture struct {
@@ -138,6 +140,138 @@ func (f fixture) fire(t *testing.T, task domain.Task) domain.TimerFire {
 		t.Fatal(err)
 	}
 	return fire
+}
+
+// Schema repair tests own a database because their DDL must not interfere with
+// service package tests using the shared bots_test schema.
+func setupBootstrapPG(t *testing.T) *Store {
+	t.Helper()
+	dsn := os.Getenv("BOTS_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("set BOTS_TEST_DATABASE_URL to an isolated bots_test database")
+	}
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admin, err := Open(t.Context(), dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(admin.Close)
+	var adminDatabase string
+	if err := admin.Pool.QueryRow(t.Context(), `SELECT current_database()`).Scan(&adminDatabase); err != nil || adminDatabase != cfg.ConnConfig.Database {
+		t.Fatalf("schema test admin connected to %q instead of %q: %v", adminDatabase, cfg.ConnConfig.Database, err)
+	}
+	name, err := domain.NewID("bots_bootstrap_test_")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admin.Pool.Exec(t.Context(), `CREATE DATABASE `+pgx.Identifier{name}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	var pool *pgxpool.Pool
+	t.Cleanup(func() {
+		if pool == nil {
+			t.Logf("leaving unverified temporary database %q", name)
+			return
+		}
+		defer pool.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var connectedDatabase string
+		if err := pool.QueryRow(ctx, `SELECT current_database()`).Scan(&connectedDatabase); err != nil || connectedDatabase != name {
+			t.Errorf("refusing cleanup for unverified database %q: connected=%q, err=%v", name, connectedDatabase, err)
+			return
+		}
+		pool.Close()
+		if _, err := admin.Pool.Exec(ctx, `DROP DATABASE `+pgx.Identifier{name}.Sanitize()+` WITH (FORCE)`); err != nil {
+			t.Error(err)
+		}
+	})
+	cfg.ConnConfig.Database = name
+	pool, err = pgxpool.NewWithConfig(t.Context(), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Store{Pool: pool}
+	var connectedDatabase string
+	if err := s.Pool.QueryRow(t.Context(), `SELECT current_database()`).Scan(&connectedDatabase); err != nil {
+		t.Fatal(err)
+	}
+	if connectedDatabase != name {
+		t.Fatalf("schema test connected to %q instead of its own database %q", connectedDatabase, name)
+	}
+	return s
+}
+
+func TestBootstrapDoesNotLockInitializedTables(t *testing.T) {
+	s := setupBootstrapPG(t)
+	ctx := t.Context()
+	if err := s.Bootstrap(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Pool.Exec(ctx, `INSERT INTO bots.bots(tenant_id,bot_id,name,enabled,account_enabled,config_hash,config) VALUES('bootstrap','bot','test',true,true,'hash','{}')`); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if err := audit(ctx, tx, domain.Scope{TenantID: "bootstrap", BotID: "bot"}, "test", "test", 1, "test", nil); err != nil {
+		t.Fatal(err)
+	}
+
+	otherPool, err := pgxpool.NewWithConfig(ctx, s.Pool.Config())
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := &Store{Pool: otherPool}
+	defer other.Close()
+	var otherDatabase string
+	if err := other.Pool.QueryRow(ctx, `SELECT current_database()`).Scan(&otherDatabase); err != nil || otherDatabase != s.Pool.Config().ConnConfig.Database {
+		t.Fatalf("bootstrap peer connected to unexpected database %q: %v", otherDatabase, err)
+	}
+	bootstrapCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	// The audit write remains uncommitted. Repeating CREATE INDEX takes a
+	// ShareLock here and cannot finish; once it holds command_outbox's ShareLock,
+	// the following command insert completes the production deadlock cycle.
+	if err := other.Bootstrap(bootstrapCtx); err != nil {
+		t.Fatalf("bootstrap blocked by an active audit transaction: %v", err)
+	}
+	if err := putCommand(ctx, tx, domain.Command{ID: "bootstrap-command", TenantID: "bootstrap", BotID: "bot", Kind: "agent", RefID: "bot", Revision: 1, Payload: raw(map[string]string{})}); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBootstrapRepairsMissingRelations(t *testing.T) {
+	s := setupBootstrapPG(t)
+	ctx := t.Context()
+	if err := s.Bootstrap(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, drop := range []string{`DROP INDEX bots.inbox_pending`, `DROP TABLE bots.knowledge`} {
+		if _, err := s.Pool.Exec(ctx, drop); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Bootstrap(ctx); err != nil {
+			t.Fatalf("repair after %s: %v", drop, err)
+		}
+		tx, err := s.Pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ready, err := schemaReady(ctx, tx)
+		tx.Rollback(ctx)
+		if err != nil || !ready {
+			t.Fatalf("schema incomplete after %s: ready=%v, err=%v", drop, ready, err)
+		}
+	}
 }
 
 func TestOperationReceiptAndOriginSlotAreTransactional(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"time"
 
 	"github.com/bingdilotus/bots/internal/domain"
@@ -14,6 +15,21 @@ import (
 
 //go:embed schema.sql
 var schema string
+
+// Derive the readiness check from the DDL so new tables and indexes cannot be
+// omitted from a separate list. Bootstrap still executes the complete DDL when
+// any relation is missing.
+var schemaTables = schemaNames(`(?m)^CREATE TABLE IF NOT EXISTS bots\.([a-z_]+)`)
+var schemaIndexes = schemaNames(`(?m)^CREATE (?:UNIQUE )?INDEX IF NOT EXISTS ([a-z_]+)`)
+
+func schemaNames(pattern string) []string {
+	matches := regexp.MustCompile(pattern).FindAllStringSubmatch(schema, -1)
+	names := make([]string, len(matches))
+	for i, match := range matches {
+		names[i] = match[1]
+	}
+	return names
+}
 
 type Store struct{ Pool *pgxpool.Pool }
 
@@ -41,13 +57,55 @@ func (s *Store) Bootstrap(ctx context.Context) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('bingdi-bots:schema',0))`); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, schema); err != nil {
+	if err := bootstrapSchema(ctx, tx); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+func bootstrapSchema(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('bingdi-bots:schema',0))`); err != nil {
+		return err
+	}
+	ready, err := schemaReady(ctx, tx)
+	if err != nil || ready {
+		return err
+	}
+	// Even CREATE INDEX IF NOT EXISTS takes a table ShareLock before checking
+	// whether its index exists. Repeating it on a ready database can deadlock
+	// with transactions that write these tables in a different order.
+	if _, err := tx.Exec(ctx, schema); err != nil {
+		return err
+	}
+	ready, err = schemaReady(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if !ready {
+		return errors.New("bots schema has missing or invalid relations after bootstrap")
+	}
+	return nil
+}
+
+func schemaReady(ctx context.Context, tx pgx.Tx) (bool, error) {
+	if len(schemaTables) == 0 || len(schemaIndexes) == 0 {
+		return false, errors.New("bots schema readiness check found no table or index declarations")
+	}
+	var ready bool
+	err := tx.QueryRow(ctx, `
+		WITH expected AS (
+			SELECT name, 'r'::"char" AS kind FROM unnest($1::text[]) AS name
+			UNION ALL
+			SELECT name, 'i'::"char" AS kind FROM unnest($2::text[]) AS name
+		)
+		SELECT NOT EXISTS (
+			SELECT FROM expected e
+			LEFT JOIN pg_catalog.pg_namespace n ON n.nspname='bots'
+			LEFT JOIN pg_catalog.pg_class c ON c.relnamespace=n.oid AND c.relname=e.name AND c.relkind=e.kind
+			LEFT JOIN pg_catalog.pg_index i ON i.indexrelid=c.oid
+			WHERE c.oid IS NULL OR (e.kind='i' AND (NOT i.indisvalid OR NOT i.indisready))
+		)`, schemaTables, schemaIndexes).Scan(&ready)
+	return ready, err
 }
 
 func normalized(err error) error {
