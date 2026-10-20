@@ -1,4 +1,5 @@
 /bin/
+/bots
 /coverage.out
 .env
 .env.*
@@ -8,3 +9,5 @@
 /configs/bot.yaml
 __pycache__/
 *.pyc
+
+/backups/

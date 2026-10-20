@@ -1,0 +1,37 @@
+# Example systemd unit for the single-host trial deployment.
+# Install the binary under /opt/bingdi-bots/bots, the seed under
+# /etc/bingdi/bot.yaml, and an environment file containing only secret
+# references and non-secret settings at /etc/bingdi/bots.env.
+[Unit]
+Description=Bingdi Bots organization bot
+Documentation=https://github.com/BingdiLotus/bots
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bingdi
+Group=bingdi
+WorkingDirectory=/opt/bingdi-bots
+EnvironmentFile=/etc/bingdi/bots.env
+ExecStart=/opt/bingdi-bots/bots
+Restart=always
+RestartSec=5s
+TimeoutStopSec=20s
+KillSignal=SIGTERM
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+LimitNOFILE=4096
+SyslogIdentifier=bingdi-bots
+
+[Install]
+WantedBy=multi-user.target

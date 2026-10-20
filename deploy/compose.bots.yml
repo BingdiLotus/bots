@@ -1,0 +1,36 @@
+# Example container deployment. This is a template, not a claim that the
+# container path has the same end-to-end evidence as the host process.
+#
+# The Chronotope network name below must be the actual external network.
+# If Bots runs on that network, Chronotope's APPLICATION_BRIDGES_JSON and
+# APPLICATION_TIMER_TARGETS_JSON must use http://bots:8090, not
+# host.docker.internal:8090. Add this service/network to the Chronotope
+# deployment or an override; do not duplicate its PG/Restate stack.
+services:
+  bots:
+    image: bingdi-bots:mvp
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - /etc/bingdi/bots.env
+    ports:
+      # Keep the admin/internal surface off the public interface.
+      - "127.0.0.1:8090:8090"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "/bots", "readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    networks:
+      - chronotope
+
+networks:
+  chronotope:
+    external: true
+    name: chronotope_default
