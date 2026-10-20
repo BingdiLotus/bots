@@ -2,7 +2,7 @@
 
 面向企业、组织和团队的 Bot 原生能力与治理平台。管理员管理人格、SOP、应用账号和运行范围；Bot 可以沉淀业务知识/经验，自建任务与提醒。成员通过 Slack 等外部应用交互，Bots 管理台负责配置、启停和审计。
 
-当前实现了知识与提醒的 MVP 主链：认证入站（签名 webhook 或内部 App 的 Socket Mode）、持久 inbox、五个原生工具、Chronotope 有限 run/耐久 timer、唯一 sender、回执/unknown 台账及管理员 API。G0 已使用真实 Bots 进程、PG 与 Chronotope 栈验证；真实 Slack App 已通过 Socket Mode 建立连接，成员消息与业务发送验收待测试频道授权。仓库：[BingdiLotus/bots](https://github.com/BingdiLotus/bots)。阶段状态与证据见[开发进展](docs/MVP开发进展.md)。
+当前实现了知识与提醒的 MVP 主链：认证入站（签名 webhook 或内部 App 的 Socket Mode）、持久 inbox、五个原生工具、Chronotope 有限 run/耐久 timer、唯一 sender、回执/unknown 台账及管理员 API。G0 已使用真实 Bots 进程、PG 与 Chronotope 栈验证；G1 已在私有测试频道通过真实 Slack Socket Mode、真实模型、知识/提醒、等待中崩溃重启与跨会话 recall；G2 的一次 SOP 改进仍待真实纠正轨迹与人工决议。仓库：[BingdiLotus/bots](https://github.com/BingdiLotus/bots)。阶段状态与证据见[开发进展](docs/MVP开发进展.md)。
 
 管理员可通过 `/admin` 管理工作配置、启停、知识、任务、回执和审计。页面直接嵌入 Go 服务；成员仍在 Slack 中与 Bot 交互。管理页与一次 SOP 改进的完整验收分别记录，尚未用界面可用替代实际改进结果。
 
