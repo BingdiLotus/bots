@@ -46,16 +46,17 @@
 - 2026-10-20：Restate D3 全栈恢复演练通过 5/5（卷快照、清空、恢复、worker 重注册、awakeable resolve），总墙钟 130.4s；API auth 临时关闭后恢复 on，harness fake 恢复 0，健康均 200，无残留。D2 后续尝试失败；D1+D3 仍不是完整联合 RTO。
 - 2026-10-20：独立 trial tenant/频道上线。新私有频道 `bingdi-bots-trial`；tenant `bots-trial-20261020`/Bot `bingdi-trial`，revision 1，agent `a_524bc15c…`，干净数据；容器 `bots-trial`（同镜像、read-only、`--restart unless-stopped`、127.0.0.1:8090）healthy/readyz 200/Socket connected，真实 smoke run `r_b7b24594…`、ts `1792485457.806229`；配置/seed 已迁移到 `~/.config/bots/trial`，重建后仍 healthy。旧 bot revision 2/旧频道数据保留为证据，不参与 trial。
 - 2026-10-20：D2 RustFS 回放尝试失败（归档基线 0、SSE 破坏计数 20、S3 GET 403），包装器恢复 API auth/harness/trial；D2 仍未通过，联合 RTO 只覆盖 D1+D3。
-- 2026-10-20：P0 **尚未完成**：D2/联合 RTO 未通过；systemd 模板为可选项、未在 Linux 执行。Docker trial 已上线，旧数据与 trial 隔离。见[P0 上线准备证据](evidence/P0-上线准备-2026-10-20.md)。
+- 2026-10-20：D2 修复与同窗口全栈恢复通过。Chronotope `c7b5e26` 修正 DR 测试的终态等待、幂等头、PG 计数和 RustFS 凭据，D2 4/4（replay=base=3）。同一维护窗口停 trial+全栈，卷备份/清空/回填 PG/Restate/RustFS；服务/trial ready **18.3s**，RPO **0**，RustFS 对象恢复可读，pending Restate timer 在 due+3.3s 投递 confirmed。
+- 2026-10-20：P0 **技术项完成**：Slack scopes、unknown 处置、权限撤回、Docker trial、独立频道/tenant、D1/D2/D3 与同窗口全栈恢复均通过。剩余 trial owner/opt-in/指标/回滚确认和可选 systemd；Docker trial 已上线。见[P0 上线准备证据](evidence/P0-上线准备-2026-10-20.md)。
 
 ## 当前部署与下一步
 
 运行配置、Socket Mode/webhook 两种 Slack 入口、管理 API 与分层验证见[运行与验收](运行与验收.md)；真实 G1 结果、失败轨迹和边界见[真实 Slack 与 Socket 验收](evidence/MVP-真实Slack与Socket-2026-10-20.md)。真实 workspace、测试频道和凭据引用只保存在本地 gitignored `configs/bot.yaml` 与 `.env*`，不写入仓库；更换 workspace/频道/账号需要新 Bot 或明确的开发重建。
 
-G1/G2 的代码与真实纵向门禁已通过；独立 trial 频道/tenant/Docker Bot 已上线并通过 smoke，但**受控试用的成员范围、opt-in、指标和正式启动时间尚未确认**。Slack scopes、unknown 人工处置、权限撤回演练、Docker 容器、独立 trial tenant/频道和 D1/D3 恢复已完成；仍需补 D2/联合 RTO；systemd 模板为可选，未在 Linux 执行。清单与未完成项见[部署与试用](部署与试用.md)和[P0 证据](evidence/P0-上线准备-2026-10-20.md)。
+G1/G2 的代码与真实纵向门禁已通过；独立 trial 频道/tenant/Docker Bot 已上线并通过 smoke，**技术 P0 已完成**，但受控试用的成员范围、opt-in、指标和正式启动时间尚未确认。Slack scopes、unknown 人工处置、权限撤回演练、Docker 容器、独立 trial tenant/频道、D1/D2/D3 和同窗口全栈恢复均已完成；systemd 模板为可选，未在 Linux 执行。清单与未完成项见[部署与试用](部署与试用.md)和[P0 证据](evidence/P0-上线准备-2026-10-20.md)。
 
 真实 Bot 仍是一个 workspace/测试频道、一个模型和一个渠道；SOP 只在一条目标 case 和四个 guard 上验证，且有两处 checker 误报已如实保留。后续真实使用反馈若显示候选造成回退，按新 revision 发布 baseline 内容（不倒退 revision）并记录；未来改进继续按[SOP 改进验收](SOP改进验收.md)冻结来源、fixture 和人工决议，不建设自动提案/评测平台。
 
 ## 完成审计
 
-完成前逐项核对主合同 §6 的验收矩阵、G0/G1/G2、当前代码与运行证据。G0 使用真实 PG/fake provider 覆盖故障与隔离矩阵；G1 使用真实 Slack 纵向路径；G2 完成一次真实来源、隔离配对、人工批准和真实 thread 复验。G1 的十次投递、unknown/迟到 receipt、改期/取消竞态、限额和跨 tenant 行仍由 G0/PG/fake 回归覆盖，未在真实 Slack 逐项注入；G2 的 checker 误报和单次改进边界保留在证据中。P0 上线准备仍有 D2/联合 RTO 阻塞项；systemd 为可选未验证；Slack scopes、unknown 处置、权限撤回演练、Docker 容器、独立 trial tenant/频道和 D1/D3 已完成。不将部分骨架、fake 通过、单次 SOP 改进、G1 结果或部分 P0 工作改写为完整生产发布。
+完成前逐项核对主合同 §6 的验收矩阵、G0/G1/G2、当前代码与运行证据。G0 使用真实 PG/fake provider 覆盖故障与隔离矩阵；G1 使用真实 Slack 纵向路径；G2 完成一次真实来源、隔离配对、人工批准和真实 thread 复验。G1 的十次投递、unknown/迟到 receipt、改期/取消竞态、限额和跨 tenant 行仍由 G0/PG/fake 回归覆盖，未在真实 Slack 逐项注入；G2 的 checker 误报和单次改进边界保留在证据中。P0 技术项已完成：Slack scopes、unknown 处置、权限撤回、Docker trial、独立 tenant/频道、D1/D2/D3 和同窗口全栈恢复；剩余 trial owner/opt-in/指标/回滚确认与可选 systemd。不将部分骨架、fake 通过、单次 SOP 改进、G1 结果或部分 P0 工作改写为完整生产发布。
