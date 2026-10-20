@@ -2,10 +2,40 @@ package store
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/bingdilotus/bots/internal/domain"
 	"github.com/jackc/pgx/v5"
 )
+
+const (
+	maxKnowledgeQueryTerms     = 8
+	maxKnowledgeQueryTermRunes = 64
+)
+
+// knowledgeQueryTerms keeps recall deterministic and bounded. The model supplies
+// keywords, not a full-text query: match any term, rank by how many terms each
+// record contains, then prefer newer knowledge.
+func knowledgeQueryTerms(query string) []string {
+	terms := make([]string, 0, maxKnowledgeQueryTerms)
+	seen := make(map[string]struct{}, maxKnowledgeQueryTerms)
+	for _, field := range strings.Fields(query) {
+		if runes := []rune(field); len(runes) > maxKnowledgeQueryTermRunes {
+			field = string(runes[:maxKnowledgeQueryTermRunes])
+		}
+		key := strings.ToLower(field)
+		if _, duplicate := seen[key]; duplicate {
+			continue
+		}
+		seen[key] = struct{}{}
+		terms = append(terms, field)
+		if len(terms) == maxKnowledgeQueryTerms {
+			break
+		}
+	}
+	return terms
+}
 
 type reader interface {
 	Query(context.Context, string, ...any) (pgx.Rows, error)
@@ -22,10 +52,36 @@ func queryKnowledge(ctx context.Context, q reader, scope domain.Scope, query str
 	if !scopeValid(scope) {
 		return nil, domain.ErrInvalid
 	}
-	rows, err := q.Query(ctx, `SELECT `+knowledgeColumns+` FROM bots.knowledge WHERE tenant_id=$1 AND bot_id=$2 AND ($3='' OR scope_id=$3) AND active AND ($4='' OR content ILIKE '%'||$4||'%') ORDER BY created_at DESC,id LIMIT $5`, scope.TenantID, scope.BotID, scope.ScopeID, query, limit(n))
+	terms := knowledgeQueryTerms(query)
+	if len(terms) == 0 {
+		rows, err := q.Query(ctx, `SELECT `+knowledgeColumns+` FROM bots.knowledge WHERE tenant_id=$1 AND bot_id=$2 AND ($3='' OR scope_id=$3) AND active ORDER BY created_at DESC,id LIMIT $4`, scope.TenantID, scope.BotID, scope.ScopeID, limit(n))
+		if err != nil {
+			return nil, err
+		}
+		return scanKnowledgeRows(rows)
+	}
+	matches := make([]string, len(terms))
+	scores := make([]string, len(terms))
+	args := make([]any, 0, len(terms)+4)
+	args = append(args, scope.TenantID, scope.BotID, scope.ScopeID)
+	for i, term := range terms {
+		args = append(args, term)
+		// strpos treats LIKE metacharacters literally and lower() keeps matching
+		// consistent across Latin keywords and mixed-case channels.
+		match := fmt.Sprintf("strpos(lower(content), lower($%d)) > 0", i+4)
+		matches[i], scores[i] = match, "("+match+")::int"
+	}
+	args = append(args, limit(n))
+	statement := `SELECT ` + knowledgeColumns + ` FROM bots.knowledge WHERE tenant_id=$1 AND bot_id=$2 AND ($3='' OR scope_id=$3) AND active AND (` +
+		strings.Join(matches, " OR ") + `) ORDER BY (` + strings.Join(scores, " + ") + `) DESC, created_at DESC,id LIMIT $` + fmt.Sprint(len(args))
+	rows, err := q.Query(ctx, statement, args...)
 	if err != nil {
 		return nil, err
 	}
+	return scanKnowledgeRows(rows)
+}
+
+func scanKnowledgeRows(rows pgx.Rows) ([]domain.Knowledge, error) {
 	defer rows.Close()
 	out := []domain.Knowledge{}
 	for rows.Next() {

@@ -15,7 +15,7 @@ func NativeTools() []ApplicationTool {
 		{
 			ModelAlias: "recall", ToolRef: "recall",
 			Description: "检索当前授权作用域内有效的知识或经验，返回内容、来源及revision。其它频道、Bot或租户的资产不可读取。",
-			InputSchema: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"检索关键词；空字符串用于最近有效知识"}},"required":["query"],"additionalProperties":false}`),
+			InputSchema: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"检索关键词，多个关键词以空格分隔；返回命中关键词更多的有效知识；空字符串用于最近有效知识"}},"required":["query"],"additionalProperties":false}`),
 		},
 		{
 			ModelAlias: "create_reminder", ToolRef: "create_reminder",

@@ -325,6 +325,43 @@ func TestOperationReceiptAndOriginSlotAreTransactional(t *testing.T) {
 	}
 }
 
+func TestRecallMatchesNaturalKeywordQueries(t *testing.T) {
+	f := setupPG(t)
+	oldFact := "Bingdi MVP 真实 Slack 验收，代码 b4e8ee3。"
+	newFact := "真实 Slack 重启验收，日期 2026-10-20，代码 b4e8ee3。"
+	f.call(t, "remember-old", "remember", map[string]string{"content": oldFact, "kind": "knowledge"})
+	f.call(t, "remember-new", "remember", map[string]string{"content": newFact, "kind": "knowledge"})
+	recall := func(t *testing.T, op, query string) []domain.Knowledge {
+		t.Helper()
+		var result struct {
+			Items []domain.Knowledge `json:"items"`
+		}
+		if err := json.Unmarshal(f.call(t, op, "recall", map[string]string{"query": query}), &result); err != nil {
+			t.Fatalf("decode recall result: %v", err)
+		}
+		return result.Items
+	}
+	// A member question reaches the model as a multi-keyword query. It must not
+	// be matched as one literal substring of stored content.
+	items := recall(t, "natural", "真实 Slack 重启验收 日期 代码版本")
+	if len(items) != 2 || items[0].Content != newFact {
+		t.Fatalf("relevant knowledge was not ranked first: %+v", items)
+	}
+	items = recall(t, "unique", "重启验收 日期")
+	if len(items) != 1 || items[0].Content != newFact {
+		t.Fatalf("unique keyword matched unrelated knowledge: %+v", items)
+	}
+	if items = recall(t, "missing", "没有保存过的事实"); len(items) != 0 {
+		t.Fatalf("unmatched keywords returned knowledge: %+v", items)
+	}
+	if items = recall(t, "literal", "%"); len(items) != 0 {
+		t.Fatalf("LIKE metacharacter was interpreted as a wildcard: %+v", items)
+	}
+	if items = recall(t, "recent", " "); len(items) != 2 || items[0].Content != newFact {
+		t.Fatalf("empty query did not return recent knowledge: %+v", items)
+	}
+}
+
 func TestFireAcceptancePauseOldRevisionAndReceipt(t *testing.T) {
 	f := setupPG(t)
 	ctx := t.Context()
