@@ -56,7 +56,7 @@
 
 - 2026-10-21：可观测性最小实现（PR #2，main CI `39515748812`）：`/metrics` 暴露 `bots_up/ready`、inbox/task/delivery 状态计数和 active knowledge；`scripts/trial-health.sh` 巡检 ready/unknown/rejected。镜像 `bingdi-bots:mvp-20261021-metrics` 已部署 trial，metrics healthy/readyz 200，trial-health 退出 0。未包含文本、token 或 Slack ID；阈值/owner 仍待确认。详见[试用可观测性证据](evidence/试用可观测性-2026-10-21.md)。
 
-## 当前部署与下一步
+- 2026-10-21：发布 `v0.1.0-mvp` 的 release notes 已加入 `docs/releases/v0.1.0-mvp.md`；tag 指向包含这些 notes 的 main 提交。
 
 运行配置、Socket Mode/webhook 两种 Slack 入口、管理 API 与分层验证见[运行与验收](运行与验收.md)；真实 G1 结果、失败轨迹和边界见[真实 Slack 与 Socket 验收](evidence/MVP-真实Slack与Socket-2026-10-20.md)。真实 workspace、测试频道和凭据引用只保存在本地 gitignored `configs/bot.yaml` 与 `.env*`，不写入仓库；更换 workspace/频道/账号需要新 Bot 或明确的开发重建。
 
