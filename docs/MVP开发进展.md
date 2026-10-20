@@ -49,14 +49,14 @@
 - 2026-10-20：D2 修复与同窗口全栈恢复通过。Chronotope `c7b5e26` 修正 DR 测试的终态等待、幂等头、PG 计数和 RustFS 凭据，D2 4/4（replay=base=3）。同一维护窗口停 trial+全栈，卷备份/清空/回填 PG/Restate/RustFS；服务/trial ready **18.3s**，RPO **0**，RustFS 对象恢复可读，pending Restate timer 在 due+3.3s 投递 confirmed。
 - 2026-10-20：test-only loop budget + 自动多轮驱动器验证。`BOTS_TEST_MAX_PEER_ROUNDS=2` 为 per-bot/thread 进程内预算；`test/lab/drive.py` 以 Lab B 发起 3 次 peer 尝试，A 只接 2 次，第 3 次被截断；A/B final 均 confirmed，无 unknown/循环。它不替代全局预算，重启清零。详见[实验室证据](evidence/多Bot实验室-2026-10-20.md)。
 - 2026-10-20：test-only 2-Bot 真 Slack 实验室通过一跳验证：两个 tenant/app/容器，env-only peer allowlist 只接受显式 app_mention；A→B 转交 confirmed，B 接受；B 首次回复 transport unknown 已 resolve rejected，直接 @B confirmed；无隐式循环。Trial 暂停，Lab A 复用现有 app。新 app 仍有默认多余 scopes，test-only。详见[实验室证据](evidence/多Bot实验室-2026-10-20.md)。
-- 2026-10-21：回归主线。停 test-only Lab A/B，启动 `bots-trial`；trial healthy/readyz 200。trial 现有 inbox 5、task 1（completed）、delivery 3（全部 confirmed）、knowledge 1（全栈演练），正式试用前仍需清理或换新 tenant。Lab 数据保留、App B 仅 test-only。
+- 2026-10-21：MVP 主链收口。停 test-only Lab A/B，启动 `bots-trial`；停用全栈演练知识（active knowledge 0），主线最终 smoke run `r_2ba155d6…`，final “主链可用” confirmed，真实 ts `1792537359.744669`；trial healthy/readyz 200。G0/G1/G2、P0 技术项和主线 smoke 已收口；剩余 owner/opt-in/指标/回滚、admin token 轮换、metrics/告警和 push/CI。
 - 2026-10-20：P0 **技术项完成**：Slack scopes、unknown 处置、权限撤回、Docker trial、独立频道/tenant、D1/D2/D3 与同窗口全栈恢复均通过。剩余 trial owner/opt-in/指标/回滚确认和可选 systemd；Docker trial 已上线。见[P0 上线准备证据](evidence/P0-上线准备-2026-10-20.md)。
 
 ## 当前部署与下一步
 
 运行配置、Socket Mode/webhook 两种 Slack 入口、管理 API 与分层验证见[运行与验收](运行与验收.md)；真实 G1 结果、失败轨迹和边界见[真实 Slack 与 Socket 验收](evidence/MVP-真实Slack与Socket-2026-10-20.md)。真实 workspace、测试频道和凭据引用只保存在本地 gitignored `configs/bot.yaml` 与 `.env*`，不写入仓库；更换 workspace/频道/账号需要新 Bot 或明确的开发重建。
 
-G1/G2 的代码与真实纵向门禁已通过；独立 trial 频道/tenant/Docker Bot 已上线并通过 smoke，**技术 P0 已完成**，但受控试用的成员范围、opt-in、指标和正式启动时间尚未确认。Slack scopes、unknown 人工处置、权限撤回演练、Docker 容器、独立 trial tenant/频道、D1/D2/D3 和同窗口全栈恢复均已完成；systemd 模板为可选，未在 Linux 执行。清单与未完成项见[部署与试用](部署与试用.md)和[P0 证据](evidence/P0-上线准备-2026-10-20.md)。
+G1/G2 的代码与真实纵向门禁已通过；独立 trial 频道/tenant/Docker Bot 已上线，全栈演练知识已停用，主线 smoke 已 confirmed。**MVP 主链和 P0 技术项完成**；受控试用的成员范围、opt-in、指标和正式启动时间尚未确认。Slack scopes、unknown 人工处置、权限撤回演练、Docker 容器、独立 trial tenant/频道、D1/D2/D3 和同窗口全栈恢复均已完成；systemd 模板为可选，未在 Linux 执行。清单与未完成项见[部署与试用](部署与试用.md)和[P0 证据](evidence/P0-上线准备-2026-10-20.md)。
 
 真实 Bot 仍是一个 workspace/测试频道、一个模型和一个渠道；SOP 只在一条目标 case 和四个 guard 上验证，且有两处 checker 误报已如实保留。后续真实使用反馈若显示候选造成回退，按新 revision 发布 baseline 内容（不倒退 revision）并记录；未来改进继续按[SOP 改进验收](SOP改进验收.md)冻结来源、fixture 和人工决议，不建设自动提案/评测平台。
 
