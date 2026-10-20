@@ -47,6 +47,7 @@
 - 2026-10-20：独立 trial tenant/频道上线。新私有频道 `bingdi-bots-trial`；tenant `bots-trial-20261020`/Bot `bingdi-trial`，revision 1，agent `a_524bc15c…`，干净数据；容器 `bots-trial`（同镜像、read-only、`--restart unless-stopped`、127.0.0.1:8090）healthy/readyz 200/Socket connected，真实 smoke run `r_b7b24594…`、ts `1792485457.806229`；配置/seed 已迁移到 `~/.config/bots/trial`，重建后仍 healthy。旧 bot revision 2/旧频道数据保留为证据，不参与 trial。
 - 2026-10-20：D2 RustFS 回放尝试失败（归档基线 0、SSE 破坏计数 20、S3 GET 403），包装器恢复 API auth/harness/trial；D2 仍未通过，联合 RTO 只覆盖 D1+D3。
 - 2026-10-20：D2 修复与同窗口全栈恢复通过。Chronotope `c7b5e26` 修正 DR 测试的终态等待、幂等头、PG 计数和 RustFS 凭据，D2 4/4（replay=base=3）。同一维护窗口停 trial+全栈，卷备份/清空/回填 PG/Restate/RustFS；服务/trial ready **18.3s**，RPO **0**，RustFS 对象恢复可读，pending Restate timer 在 due+3.3s 投递 confirmed。
+- 2026-10-20：test-only loop budget + 自动多轮驱动器验证。`BOTS_TEST_MAX_PEER_ROUNDS=2` 为 per-bot/thread 进程内预算；`test/lab/drive.py` 以 Lab B 发起 3 次 peer 尝试，A 只接 2 次，第 3 次被截断；A/B final 均 confirmed，无 unknown/循环。它不替代全局预算，重启清零。详见[实验室证据](evidence/多Bot实验室-2026-10-20.md)。
 - 2026-10-20：test-only 2-Bot 真 Slack 实验室通过一跳验证：两个 tenant/app/容器，env-only peer allowlist 只接受显式 app_mention；A→B 转交 confirmed，B 接受；B 首次回复 transport unknown 已 resolve rejected，直接 @B confirmed；无隐式循环。Trial 暂停，Lab A 复用现有 app。新 app 仍有默认多余 scopes，test-only。详见[实验室证据](evidence/多Bot实验室-2026-10-20.md)。
 - 2026-10-20：P0 **技术项完成**：Slack scopes、unknown 处置、权限撤回、Docker trial、独立频道/tenant、D1/D2/D3 与同窗口全栈恢复均通过。剩余 trial owner/opt-in/指标/回滚确认和可选 systemd；Docker trial 已上线。见[P0 上线准备证据](evidence/P0-上线准备-2026-10-20.md)。
 

@@ -23,7 +23,24 @@ BOTS_TEST_ALLOWED_BOT_IDS=B0PEER1,B0PEER2
 - 自身 bot user 永远过滤；默认空，不设置时生产行为不变。
 - 启动时若非空会打一条 `test-only peer bot allowlist enabled` 警告。
 - 它不是 seed/config/API 字段，只存在于 lab 容器 env；不要让生产进程设置。
-- 两个 bot 的 instructions 必须限制“最多回复一轮、非必要不再 @ 对方”，并在实验中手动监控；该开关不提供全局轮次预算。
+
+### Loop budget 与多轮驱动器
+
+第二个 env-only 开关：
+
+```sh
+BOTS_TEST_MAX_PEER_ROUNDS=2
+```
+
+每个 Bot 进程对同一 `thread_ts` 只接受前 N 条 peer app_mention；计数在 inbox 真正创建后增加，human mention 不计。它是**进程内、非持久**预算，重启清零；两个 bot 各自有预算，合并是链路上限，不是全局共享计数器。
+
+`test/lab/drive.py` 是 test-only 自动驱动器：用 Lab B 的 bot token 发一条顶层 @A，再在同一 thread 追加 peer 尝试；每轮等待 A inbox 增长。它不打印 token，结束时输出 A/B inbox delta 和最近 delivery。用法：
+
+```sh
+python3 test/lab/drive.py --attempts 3 --max-wait 180
+```
+
+实测（budget=2，attempts=3）：A inbox +2、B inbox +1；第 3 次 A 请求被 budget 截断；A/B 最终均 confirmed，无 unknown、无循环。
 
 ## 关键边界
 
@@ -44,8 +61,9 @@ BOTS_TEST_ALLOWED_BOT_IDS=B0PEER1,B0PEER2
 
 - A→B 显式 peer mention 已打通：A final confirmed，B 接受并完成 run。
 - B 首次回复遇到 Slack `transport_error`，落 unknown；用 resolve API 记 rejected；随后直接 @B confirmed。
-- 无隐式循环；A/B inbox 各 2 条。详见[实验室证据](evidence/多Bot实验室-2026-10-20.md)。
+- 增加 per-bot/thread `BOTS_TEST_MAX_PEER_ROUNDS` 与 `test/lab/drive.py`；budget=2、3 次 driver 尝试时 A 只接 2 次，第 3 次被截断，A/B 均 confirmed，无循环。
 - 新 app 实际 scopes 仍为默认 12 个（CLI `apps.status` EOF，未能 sync manifest）；test-only，扩大前必须收紧。
+- 详见[实验室证据](evidence/多Bot实验室-2026-10-20.md)。
 
 ## 首批场景
 
