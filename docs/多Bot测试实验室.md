@@ -40,6 +40,13 @@ BOTS_TEST_ALLOWED_BOT_IDS=B0PEER1,B0PEER2
 4. 维护者创建两个 lab tenant/seed、tenant key、Chronotope bridge/timer，启动两个容器（8091/8092），并暂停 trial。
 5. 操作者/AI 驱动器发消息，记录 inbox/delivery/audit 和两个 bot 的回复；结束停 Lab A、恢复 trial。
 
+## 2026-10-20 实测
+
+- A→B 显式 peer mention 已打通：A final confirmed，B 接受并完成 run。
+- B 首次回复遇到 Slack `transport_error`，落 unknown；用 resolve API 记 rejected；随后直接 @B confirmed。
+- 无隐式循环；A/B inbox 各 2 条。详见[实验室证据](evidence/多Bot实验室-2026-10-20.md)。
+- 新 app 实际 scopes 仍为默认 12 个（CLI `apps.status` EOF，未能 sync manifest）；test-only，扩大前必须收紧。
+
 ## 首批场景
 
 1. `@bingdi-a`/`@bingdi-b` 分别被 @，验证路由和身份不串。
