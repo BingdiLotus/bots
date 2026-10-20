@@ -1,6 +1,6 @@
 # 一次 SOP 改进的操作合同
 
-本文件细化 [MVP G2](MVP设计.md) 的一次人工治理闭环。它是操作与报告约定，不代表已经生成候选、运行对照或获得发布批准。当前还缺真实 G1 失败/人工纠正轨迹；不会用计时器网络超时替代可由 SOP 改善的问题，也不会用 fake 模型的固定行为证明收益。
+本文件细化 [MVP G2](MVP设计.md) 的一次人工治理闭环。它是操作与报告约定；2026-10-20 已按本文件完成一次真实实例（[证据](evidence/MVP-SOP改进-2026-10-20.md)），下文的冻结、隔离对照、人工决议和回退要求继续适用于后续改进。不会用计时器网络超时替代可由 SOP 改善的问题，也不会用 fake 模型的固定行为证明收益。
 
 ## 1. 先保存来源和基线
 
@@ -45,4 +45,6 @@ baseline 与 candidate 逐题配对，分别使用隔离测试身份和等价的
 
 ## 当前状态
 
-配置 CAS、不可变 runtime agent、新旧 thread 绑定及回退所需底层机制已实现并有 PG 测试。管理页按同一 API 操作。真实 G1 纠正轨迹、候选、独立对照、人工决议和新会话反馈仍是待完成的 G2 证据；本文件不能代替这些步骤。
+配置 CAS、不可变 runtime agent、新旧 thread 绑定及回退所需底层机制已实现并有 PG 测试。管理页按同一 API 操作。
+
+2026-10-20 已完成一次实例：真实 G1 recall 轨迹 → 用户确认纠正 → 真实模型候选 → 冻结 5-case fixture/checker → 两隔离 test tenant 配对 → 用户批准 → CAS 发布真实 Bot revision 2（agent `a_e1497669…`，仅 instructions 变化）→ 真实 Slack 新 thread 验证通过（session revision 2，run `r_32013c8d…`，真实 ts `1792459570.858859`，无交叉记录）；反馈 pass，rollback=null。期间 v1 fixture 未复现 baseline 差异，作为 null 结果保留；最终 v2 fixture 与两处 checker 误报均在[证据](evidence/MVP-SOP改进-2026-10-20.md)中说明。该实例不建立自动提案/评测平台，也不代表后续 SOP 改动会自动批准。

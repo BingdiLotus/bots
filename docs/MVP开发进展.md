@@ -1,12 +1,12 @@
 # Bingdi Bots MVP 开发进展
 
-> 开发基线 `87c1021`，分支 `codex/mvp`；产品合同为 [MVP 设计](MVP设计.md)，执行依赖为 [Chronotope 应用接入契约](../../chronotope/docs/应用接入契约.md)。2026-10-20 的真实 Slack G1 验收使用 `b4e8ee3`，随后以 `29d1426`、`30b0dfa` 修复验收中发现的 recall 与 run binding 缺陷。本轮从 HTTP 骨架开始实现，不以参考 fixture 代替 Bots 产品实现。
+> 开发基线 `87c1021`，分支 `codex/mvp`；产品合同为 [MVP 设计](MVP设计.md)，执行依赖为 [Chronotope 应用接入契约](../../chronotope/docs/应用接入契约.md)。2026-10-20 的真实 Slack G1 验收使用 `b4e8ee3`，随后以 `29d1426`、`30b0dfa` 修复验收中发现的 recall 与 run binding 缺陷；同日完成一次 G2 SOP 改进并发布真实 Bot revision 2。本轮从 HTTP 骨架开始实现，不以参考 fixture 代替 Bots 产品实现。
 
 | 阶段 | 状态 | 完成证据 |
 |---|---|---|
 | G0：确定性知识、提醒与恢复闭环 | 通过 | 实际 PG tests/race、五工具、签名入站、唯一 sender、真实 Bots/Chronotope/Restate 进程联调；[G0 证据](evidence/MVP-G0-2026-10-19.md)与[提交 timer 前实际 SIGKILL 补验](evidence/MVP-管理页与崩溃恢复-2026-10-19.md) |
 | G1：真实模型与 Slack 私有安装 | 通过 | [真实 Slack Socket Mode、知识/提醒、等待中 SIGKILL 重启与跨会话 recall](evidence/MVP-真实Slack与Socket-2026-10-20.md)：真实 `claude-sonnet-4-6`、6 条 confirmed Slack ts、2 条有效知识/2 个完成任务；首次 recall 空结果与后续 binding 滞留均保留并修复后重验 |
-| G2：最小管理与一次 SOP 改进 | 管理页通过，改进闭环待来源 | [管理页实际 PG/浏览器验收](evidence/MVP-管理页与崩溃恢复-2026-10-19.md)通过；真实纠正轨迹、固定模型/独立 fixture 对照、人工决议及新 session 反馈尚缺，[操作合同](SOP改进验收.md)已明确 |
+| G2：最小管理与一次 SOP 改进 | 通过 | [管理页实际 PG/浏览器验收](evidence/MVP-管理页与崩溃恢复-2026-10-19.md)；[一次真实 SOP 改进](evidence/MVP-SOP改进-2026-10-20.md)：真实纠正、冻结 fixture、真实模型配对、用户批准、revision 2 发布及真实新 thread 验证 |
 
 ## 开发记录
 
@@ -32,13 +32,16 @@
 - 2026-10-20：G1 判定口径：真实 Slack 覆盖新知识、原生提醒、真实 message ts、等待中崩溃重启、新 session recall、管理员启停/审计；十次投递去重、unknown/迟到 receipt、改期/取消竞态、执行限额和跨 tenant/bot/scope 仍由 G0 的真实 PG/fake provider 回归覆盖，没有在真实 Slack 上逐行注入故障。真实与 fake 证据分开记录，不把 fake 行算作真实渠道通过。
 - 2026-10-20：真实验收发现并修复两个缺陷，失败轨迹保留。`29d1426`：`recall` 原先把整段 query 当子串，模型给出多个自然关键词时返回空；改为有界关键词匹配、命中数排序和字面 `strpos`。`30b0dfa`：dispatcher 用当前二进制重算 immutable agent 的完整工具元数据，工具描述变化后已完成的 canonical run 被拒绝收集；改为比较治理配置并保留工具 ref/可信上下文校验。修复后同一 canonical run 在重启后补发真实 Slack 最终回复，证明不重放模型。
 - 2026-10-20：真实 Slack 证据、6 条 delivery、重启 PID/timer 和两次缺陷的失败/修复哈希见[真实 Slack 与 Socket 验收](evidence/MVP-真实Slack与Socket-2026-10-20.md)。真实验收结束后停止临时 Bots 进程，保留 Chronotope 栈和 PG/Restate 数据卷；没有删除失败 recall 的实际 Slack 消息。
+- 2026-10-20：G2 完成一次真实 SOP 改进。来源是 G1 新 thread recall 回复主动展开交叉记录；用户确认纠正“只引用最相关一条来源，不主动展开其它记录”。真实模型生成候选 patch（run `r_986950cb…`），独立 5-case fixture/checker 在候选 v2 前冻结；第一次 v1 fixture 未复现 baseline 差异，作为 null 结果保留并改用 v2。
+- 2026-10-20：隔离配对使用两个 test tenant、相同初始知识和真实 `claude-sonnet-4-6`，只连接计数 sink。目标 case：baseline 列出已废弃 `2026-10-18` 初版记录，candidate 只返回 `2026-10-20`、`b4e8ee3` 和一条来源；无 candidate-only guard regression。两处 checker 误报（baseline 日期格式、两臂共同的提醒措辞）原始保留。成本 baseline 9 calls/9,277 tokens、candidate 9/9,525、proposal 827；sink 回执全部 confirmed。
+- 2026-10-20：用户于 09:23:44 批准；通过管理 API CAS 发布 revision 2（agent `a_e1497669…`，仅 instructions 变化）。真实 Slack 新 thread 验证：session revision 2、run `r_32013c8d…`、2 次 LLM 调用/2,265 tokens，最终只返回当前记录/来源，真实 ts `1792459570.858859`，旧 thread 仍为 revision 1；反馈 pass，无回退。证据见[一次 SOP 改进](evidence/MVP-SOP改进-2026-10-20.md)。
 
 ## 当前部署与下一步
 
 运行配置、Socket Mode/webhook 两种 Slack 入口、管理 API 与分层验证见[运行与验收](运行与验收.md)；真实 G1 结果、失败轨迹和边界见[真实 Slack 与 Socket 验收](evidence/MVP-真实Slack与Socket-2026-10-20.md)。真实 workspace、测试频道和凭据引用只保存在本地 gitignored `configs/bot.yaml` 与 `.env*`，不写入仓库；更换 workspace/频道/账号需要新 Bot 或明确的开发重建。
 
-G1 已关闭。G2 仍待一次真实、可由 SOP 改善的纠正轨迹：从该轨迹冻结 baseline、生成一条 instructions 候选及可检验假设，在隔离身份/初始知识/固定模型与 sink 上做 baseline/candidate 配对，再由人批准或拒绝并在新 thread 验证、记录反馈和回退；操作合同见[SOP 改进验收](SOP改进验收.md)。本轮 recall 空结果属于代码缺陷，已由代码和 PG 回归修复，不作为 SOP 改进收益。完成这些之前不宣布完整 MVP 发布。
+G1 已关闭；G2 的一次 SOP 改进已完成并发布 revision 2。G0/G1/G2 三个 MVP 阶段现已全部通过，可以进入受控试用，但不宣称生产级或长期收益。真实 Bot 仍是一个 workspace/测试频道、一个模型和一个渠道；SOP 只在一条目标 case 和四个 guard 上验证，且有两处 checker 误报已如实保留。后续真实使用反馈若显示候选造成回退，按新 revision 发布 baseline 内容（不倒退 revision）并记录；未来改进继续按[SOP 改进验收](SOP改进验收.md)冻结来源、fixture 和人工决议，不建设自动提案/评测平台。
 
 ## 完成审计
 
-完成前逐项核对主合同 §6 的验收矩阵、G0/G1/G2、当前代码与运行证据。G1 已通过真实 Slack 证据关闭；G2 未完成。不将部分骨架、fake 通过或 G1 结果改写为完整 MVP 发布。
+完成前逐项核对主合同 §6 的验收矩阵、G0/G1/G2、当前代码与运行证据。G0 使用真实 PG/fake provider 覆盖故障与隔离矩阵；G1 使用真实 Slack 纵向路径；G2 完成一次真实来源、隔离配对、人工批准和真实 thread 复验。G1 的十次投递、unknown/迟到 receipt、改期/取消竞态、限额和跨 tenant 行仍由 G0/PG/fake 回归覆盖，未在真实 Slack 逐项注入；G2 的 checker 误报和单次改进边界保留在证据中。不将部分骨架、fake 通过、单次 SOP 改进或 G1 结果改写为完整生产发布。
