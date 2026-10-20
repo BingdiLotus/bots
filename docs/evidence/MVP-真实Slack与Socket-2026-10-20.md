@@ -115,10 +115,10 @@ Slack 历史实际可见两条 Bot 消息，thread 和 ts 与 delivery 回执一
 GOTOOLCHAIN=go1.26.0 make check
 BOTS_TEST_DATABASE_URL='postgres://chronotope:chronotope_dev@127.0.0.1:5432/bots_test?sslmode=disable' \
   GOTOOLCHAIN=go1.26.0 go test -race ./...
-python3 test/e2e/mvp.py --mode fake --state-dir /tmp/bots-mvp-socket-20261020 --timer-delay 30
+python3 test/e2e/mvp.py --mode fake --state-dir /tmp/bots-mvp-final-20261020 --timer-delay 30
 ```
 
-`make check` 与完整 race（含实际 PG）通过；fake E2E 的七项检查全部通过，包括 timer 接纳前 SIGKILL、等待中重启、暂停接纳 fire、恢复发送和新 session recall。其报告 SHA-256 为 `38038a75691f89569d84e21739a4127ece1e14f4bc827de2ad24daedae716b98`。fake E2E 的 Slack 仍是计数 sink，不能替代本文件真实 Slack 证据。
+`make check` 与完整 race（含实际 PG）通过；在包含两个真实缺陷修复的最终代码上复跑 fake E2E，七项检查全部通过，包括 timer 接纳前 SIGKILL、等待中重启、暂停接纳 fire、恢复发送和新 session recall。其报告 SHA-256 为 `6fd117f2dd32ddfca0c97177e3c1f123fe181e8cd1b658f60fc8bbda14bdb489`。fake E2E 的 Slack 仍是计数 sink，不能替代本文件真实 Slack 证据。
 
 真实进程启动方式（凭据只从环境导入，不写入命令或仓库）：
 
