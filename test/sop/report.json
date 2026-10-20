@@ -1,0 +1,983 @@
+{
+  "version": 1,
+  "generated_at": "2026-10-20T09:18:45+08:00",
+  "only_cases": null,
+  "mode": "real-model isolated sink",
+  "code_commit": "d1eb0756d4a2225c50dc0310d9073551aa04ed55",
+  "code_dirty": true,
+  "model": "claude-sonnet-4-6",
+  "source_trace": {
+    "version": 1,
+    "source": "real G1 private Slack test channel; recall reply after Socket Mode restart",
+    "tenant_id": "bots-slack-g1",
+    "bot_id": "bingdi",
+    "thread_ts": "1792457447.132529",
+    "message_ts": "1792457447.132529",
+    "input": "请检索已保存知识：真实 Slack 重启验收的日期和代码版本，并注明来源。",
+    "run_id": "r_1f30323eb2b3a70c310c178a761033b3",
+    "session_id": "s_5507d92f3e7e8881e5e1c7791047ff6b",
+    "final": "已保存知识显示：\n\n- **真实 Slack 重启验收日期**：2026-10-20  \n- **代码版本**：`b4e8ee3`  \n- **来源**：保存知识 `knowledge_f4a4dea7071ab57d5edd96ab4a684916`，原始来源 Slack 消息 `slack_message_e9cfd288ffaa38ebfac1ee0a2be7037d`。  \n\n另有一条交叉记录也确认代码为 `b4e8ee3`，来源 Slack 消息 `slack_message_f2a90bbac6d52000fe7ec3c3ca49b65e`。",
+    "final_delivery_ts": "1792457719.778009",
+    "knowledge": [
+      {
+        "id": "knowledge_5f864d4d2759296d6b5e0a8e69b0011e",
+        "content": "Bingdi MVP 真实 Slack 验收，代码 b4e8ee3。",
+        "source_id": "slack_message_f2a90bbac6d52000fe7ec3c3ca49b65e"
+      },
+      {
+        "id": "knowledge_f4a4dea7071ab57d5edd96ab4a684916",
+        "content": "真实 Slack 重启验收，日期 2026-10-20，代码 b4e8ee3。",
+        "source_id": "slack_message_e9cfd288ffaa38ebfac1ee0a2be7037d"
+      }
+    ],
+    "observed_problem": "最终回复在请求的日期/代码之外，主动展开了另一条交叉记录（Bingdi MVP 真实 Slack 验收），而成员只要求检索已保存知识并注明来源。",
+    "correction": "回答查询时先给直接答案，只引用最相关的一条来源；除非成员要求更多或检索结果互相冲突，不主动展开其它记录。",
+    "confirmed_by": "user",
+    "confirmed_at": "2026-10-20T09:14:00+08:00",
+    "candidate_context": {
+      "included": [
+        "input",
+        "final",
+        "baseline_instructions",
+        "correction"
+      ],
+      "excluded": [
+        "suite.json",
+        "checker.py",
+        "case set",
+        "checker logic"
+      ]
+    }
+  },
+  "baseline": {
+    "revision": 1,
+    "config_hash": "355fb18d637bb9b0199fc5aa292648f9e088fa1f19393857838b75d2bdd1003d",
+    "runtime_agent_id": "a_ecb7b01a2b8e5a5e67e9b77d90cf2db9",
+    "instructions_sha256": "2233f2229be416533cbbc22a5da3b039ccc721a298aa39f6f28dfd1d13a20cca"
+  },
+  "candidate": {
+    "proposal_run_id": "r_986950cb962bee589d8f7cee5167c6e5",
+    "proposal_agent_id": "a_66b267311b947292ab348aeff92cb0cc",
+    "proposal_session_id": "s_85191c6fc7c9bcf68491cab5ede1aa31",
+    "proposal_model": "claude-sonnet-4-6",
+    "proposal_usage": {
+      "compute_seconds": 0,
+      "tokens_in": 0,
+      "tokens_out": 0,
+      "tokens_total": 827,
+      "usage_unknown": false
+    },
+    "patch": "回答知识检索时先给所问字段，仅引用最相关的一条来源；除非成员要求更多或结果冲突，不主动展开其他记录。",
+    "hypothesis": "预期：对日期和代码查询仅返回对应答案及一条最相关来源，不附加交叉记录。guard：检索结果冲突时仍须如实说明冲突并列出必要来源，不省略来源或伪造依据。",
+    "candidate_instructions_sha256": "8666855e5abcee9ca37facfb47245f190c1e52e1ab2518163aa2076d5d4bf8e6",
+    "proposal_prompt_sha256": "2de90850b80f44d73cb782a0ddba1527e26cec887e142bd73c295759c4e42012"
+  },
+  "environment": {
+    "chronotope_api": "http://127.0.0.1:8080",
+    "provider": "litellm",
+    "model_alias": "claude-sonnet-4-6",
+    "model_upstream_version": "unknown",
+    "harness": "existing Chronotope harness",
+    "tool_schema_sha256": "1492d9c2354e160947142ac9078aec487b3eaaec73e9ee320b252cc91f9b7d59"
+  },
+  "fixtures": {
+    "suite_sha256": "3aee8dc4d96bf85a3fa018ff019f975a4a8d9a7c44a980abb58fa244ae7322a7",
+    "checker_sha256": "5ece73d07e3c39a058fbbfea7ed895ce37a20b87ffe7155f6d832f934c78cc6a",
+    "frozen_at": "2026-10-20T09:18:24+08:00",
+    "initial_knowledge": [
+      {
+        "id": "knowledge_10000000000000000000000000000001",
+        "content": "真实 Slack 重启验收的初版记录：计划日期是 2026-10-18。",
+        "kind": "knowledge",
+        "source_id": "sop_fixture_restart_draft",
+        "origin_command_id": "sop_fixture_seed"
+      },
+      {
+        "id": "knowledge_10000000000000000000000000000002",
+        "content": "真实 Slack 重启验收，日期 2026-10-20，代码 b4e8ee3。",
+        "kind": "knowledge",
+        "source_id": "sop_fixture_restart_review",
+        "origin_command_id": "sop_fixture_seed"
+      },
+      {
+        "id": "knowledge_10000000000000000000000000000003",
+        "content": "Orion 评审时间是 2026-10-21 15:00（Asia/Shanghai）。",
+        "kind": "knowledge",
+        "source_id": "sop_fixture_orion_review",
+        "origin_command_id": "sop_fixture_seed"
+      }
+    ],
+    "note": "suite/checker frozen before candidate generation"
+  },
+  "results": {
+    "trace_recall": {
+      "baseline": {
+        "pass": false,
+        "failures": [
+          "final contains forbidden '2026-10-18'",
+          "final contains forbidden '初版'"
+        ],
+        "final": "已保存的相关记录有两条：\n\n1. **初版记录**：计划日期为 **2026-10-18**。  \n2. **验收记录**：日期为 **2026-10-20**，代码为 **`b4e8ee3`**。",
+        "tools": [
+          "recall"
+        ],
+        "knowledge_delta": 0,
+        "task_delta": 0,
+        "task": null,
+        "task_target": null,
+        "run_id": "r_7e51d11f75cc246fb6b086dcdd0f41c3",
+        "runtime_session_id": "s_4bc2e9fbf634d0ef5e42d16c1d1c62ac",
+        "runtime_status": "completed",
+        "runtime_usage": {
+          "compute_seconds": 0,
+          "tokens_in": 2049,
+          "tokens_out": 101,
+          "tokens_total": 2150,
+          "usage_unknown": false
+        },
+        "runtime_calls": [
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:18:51.043504Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:18:51.042494Z",
+            "result_at": "2026-10-20T01:18:52.65872Z",
+            "state": "result",
+            "step": 0,
+            "tokens_in": 845,
+            "tokens_out": 35,
+            "usage_partial": false,
+            "usage_unknown": false
+          },
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:18:52.694342Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:18:52.693556Z",
+            "result_at": "2026-10-20T01:18:54.742657Z",
+            "state": "result",
+            "step": 1,
+            "tokens_in": 1204,
+            "tokens_out": 66,
+            "usage_partial": false,
+            "usage_unknown": false
+          }
+        ],
+        "llm_call_count": 2,
+        "sink_receipts": [
+          {
+            "ts": "1792459134.000001",
+            "text": "已保存的相关记录有两条：\n\n1. **初版记录**：计划日期为 **2026-10-18**。  \n2. **验收记录**：日期为 **2026-10-20**，代码为 **`b4e8ee3`**。",
+            "client_msg_id": "e9aff424-0827-598e-bf57-a2077d7dbf93"
+          }
+        ],
+        "duration_seconds": 5.12
+      },
+      "candidate": {
+        "pass": true,
+        "failures": [],
+        "final": "真实 Slack 重启验收：日期 **2026-10-20**，代码 **b4e8ee3**。  \n来源：`sop_fixture_restart_review`",
+        "tools": [
+          "recall"
+        ],
+        "knowledge_delta": 0,
+        "task_delta": 0,
+        "task": null,
+        "task_target": null,
+        "run_id": "r_0a648a927c48eb84432796ac83ffc22f",
+        "runtime_session_id": "s_37ef5750cbe557522904cdbf62050c71",
+        "runtime_status": "completed",
+        "runtime_usage": {
+          "compute_seconds": 0,
+          "tokens_in": 2119,
+          "tokens_out": 64,
+          "tokens_total": 2183,
+          "usage_unknown": false
+        },
+        "runtime_calls": [
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:18:56.036145Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:18:56.035278Z",
+            "result_at": "2026-10-20T01:18:57.632695Z",
+            "state": "result",
+            "step": 0,
+            "tokens_in": 878,
+            "tokens_out": 23,
+            "usage_partial": false,
+            "usage_unknown": false
+          },
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:18:57.665299Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:18:57.664443Z",
+            "result_at": "2026-10-20T01:18:59.514534Z",
+            "state": "result",
+            "step": 1,
+            "tokens_in": 1241,
+            "tokens_out": 41,
+            "usage_partial": false,
+            "usage_unknown": false
+          }
+        ],
+        "llm_call_count": 2,
+        "sink_receipts": [
+          {
+            "ts": "1792459139.000002",
+            "text": "真实 Slack 重启验收：日期 **2026-10-20**，代码 **b4e8ee3**。  \n来源：`sop_fixture_restart_review`",
+            "client_msg_id": "2e0a0694-9ae6-5614-9fde-7570970e5723"
+          }
+        ],
+        "duration_seconds": 4.59
+      }
+    },
+    "single_recall": {
+      "baseline": {
+        "pass": false,
+        "failures": [
+          "final missing '2026-10-21'"
+        ],
+        "final": "Orion 评审时间：**2026 年 10 月 21 日 15:00（Asia/Shanghai）**。  \n来源：已保存知识 `sop_fixture_orion_review`。",
+        "tools": [
+          "recall"
+        ],
+        "knowledge_delta": 0,
+        "task_delta": 0,
+        "task": null,
+        "task_target": null,
+        "run_id": "r_f51af88e07b08fa8e3ce9a39adc7761a",
+        "runtime_session_id": "s_ad9ebe9adea88e61cc9c2c6875a5068d",
+        "runtime_status": "completed",
+        "runtime_usage": {
+          "compute_seconds": 0,
+          "tokens_in": 2196,
+          "tokens_out": 82,
+          "tokens_total": 2278,
+          "usage_unknown": false
+        },
+        "runtime_calls": [
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:00.029064Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:00.02815Z",
+            "result_at": "2026-10-20T01:19:01.997236Z",
+            "state": "result",
+            "step": 0,
+            "tokens_in": 844,
+            "tokens_out": 35,
+            "usage_partial": false,
+            "usage_unknown": false
+          },
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:02.026902Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:02.025555Z",
+            "result_at": "2026-10-20T01:19:04.061502Z",
+            "state": "result",
+            "step": 1,
+            "tokens_in": 1352,
+            "tokens_out": 47,
+            "usage_partial": false,
+            "usage_unknown": false
+          }
+        ],
+        "llm_call_count": 2,
+        "sink_receipts": [
+          {
+            "ts": "1792459144.000003",
+            "text": "Orion 评审时间：**2026 年 10 月 21 日 15:00（Asia/Shanghai）**。  \n来源：已保存知识 `sop_fixture_orion_review`。",
+            "client_msg_id": "96d9abda-1b66-5051-aff7-4d4fb8e1d31a"
+          }
+        ],
+        "duration_seconds": 4.58
+      },
+      "candidate": {
+        "pass": true,
+        "failures": [],
+        "final": "日期：2026-10-21  \n时间：15:00（Asia/Shanghai）  \n来源：`sop_fixture_orion_review`",
+        "tools": [
+          "recall"
+        ],
+        "knowledge_delta": 0,
+        "task_delta": 0,
+        "task": null,
+        "task_target": null,
+        "run_id": "r_cca5ad47b08c3952bd7cd8e0816a8184",
+        "runtime_session_id": "s_d8fb63e0c41b343bec3c11734f89454d",
+        "runtime_status": "completed",
+        "runtime_usage": {
+          "compute_seconds": 0,
+          "tokens_in": 2270,
+          "tokens_out": 70,
+          "tokens_total": 2340,
+          "usage_unknown": false
+        },
+        "runtime_calls": [
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:05.035591Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:05.03468Z",
+            "result_at": "2026-10-20T01:19:06.775795Z",
+            "state": "result",
+            "step": 0,
+            "tokens_in": 877,
+            "tokens_out": 36,
+            "usage_partial": false,
+            "usage_unknown": false
+          },
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:06.81198Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:06.811087Z",
+            "result_at": "2026-10-20T01:19:08.856953Z",
+            "state": "result",
+            "step": 1,
+            "tokens_in": 1393,
+            "tokens_out": 34,
+            "usage_partial": false,
+            "usage_unknown": false
+          }
+        ],
+        "llm_call_count": 2,
+        "sink_receipts": [
+          {
+            "ts": "1792459148.000004",
+            "text": "日期：2026-10-21  \n时间：15:00（Asia/Shanghai）  \n来源：`sop_fixture_orion_review`",
+            "client_msg_id": "ea2ffc07-e853-555c-bb59-6e35cc3a4cd0"
+          }
+        ],
+        "duration_seconds": 4.85
+      }
+    },
+    "missing_recall": {
+      "baseline": {
+        "pass": true,
+        "failures": [],
+        "final": "我没有找到当前已保存的关于 Zephyr 项目发布日期的信息。",
+        "tools": [
+          "recall"
+        ],
+        "knowledge_delta": 0,
+        "task_delta": 0,
+        "task": null,
+        "task_target": null,
+        "run_id": "r_071eae5f409d0de0374667e31511fe38",
+        "runtime_session_id": "s_77a3b8aecc59c89bbabc48bafeac8e09",
+        "runtime_status": "completed",
+        "runtime_usage": {
+          "compute_seconds": 0,
+          "tokens_in": 1727,
+          "tokens_out": 53,
+          "tokens_total": 1780,
+          "usage_unknown": false
+        },
+        "runtime_calls": [
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:10.03606Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:10.035343Z",
+            "result_at": "2026-10-20T01:19:12.342704Z",
+            "state": "result",
+            "step": 0,
+            "tokens_in": 835,
+            "tokens_out": 34,
+            "usage_partial": false,
+            "usage_unknown": false
+          },
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:12.37712Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:12.376223Z",
+            "result_at": "2026-10-20T01:19:14.7509Z",
+            "state": "result",
+            "step": 1,
+            "tokens_in": 892,
+            "tokens_out": 19,
+            "usage_partial": false,
+            "usage_unknown": false
+          }
+        ],
+        "llm_call_count": 2,
+        "sink_receipts": [
+          {
+            "ts": "1792459154.000005",
+            "text": "我没有找到当前已保存的关于 Zephyr 项目发布日期的信息。",
+            "client_msg_id": "dfa6c9dc-b3cb-58ea-ba2b-dc7903098f53"
+          }
+        ],
+        "duration_seconds": 5.87
+      },
+      "candidate": {
+        "pass": true,
+        "failures": [],
+        "final": "未找到 Zephyr 项目发布日期的已保存记录。",
+        "tools": [
+          "recall"
+        ],
+        "knowledge_delta": 0,
+        "task_delta": 0,
+        "task": null,
+        "task_target": null,
+        "run_id": "r_c975b84ea0879e99e7163b9a8dea17ed",
+        "runtime_session_id": "s_17abc012a0f2e4353f6ced4a3b0eb12c",
+        "runtime_status": "completed",
+        "runtime_usage": {
+          "compute_seconds": 0,
+          "tokens_in": 1793,
+          "tokens_out": 50,
+          "tokens_total": 1843,
+          "usage_unknown": false
+        },
+        "runtime_calls": [
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:16.039948Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:16.038472Z",
+            "result_at": "2026-10-20T01:19:17.806033Z",
+            "state": "result",
+            "step": 0,
+            "tokens_in": 868,
+            "tokens_out": 34,
+            "usage_partial": false,
+            "usage_unknown": false
+          },
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:17.835156Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:17.834366Z",
+            "result_at": "2026-10-20T01:19:19.666634Z",
+            "state": "result",
+            "step": 1,
+            "tokens_in": 925,
+            "tokens_out": 16,
+            "usage_partial": false,
+            "usage_unknown": false
+          }
+        ],
+        "llm_call_count": 2,
+        "sink_receipts": [
+          {
+            "ts": "1792459159.000006",
+            "text": "未找到 Zephyr 项目发布日期的已保存记录。",
+            "client_msg_id": "df85a331-9600-5cb9-9cdc-66a0375f2d17"
+          }
+        ],
+        "duration_seconds": 5.1
+      }
+    },
+    "reminder_relative": {
+      "baseline": {
+        "pass": false,
+        "failures": [
+          "final missing any of ['尚未送达', '未送达', '不表示已送达', '不代表已送达']"
+        ],
+        "final": "已记住：Orion 评审改到 2026-10-22 16:00。\n\n已安排在 3 分钟后（2026-10-20 09:22:20，Asia/Shanghai）提醒你准备评审材料。提醒目前已保存并等待到点发送。",
+        "tools": [
+          "remember",
+          "create_reminder"
+        ],
+        "knowledge_delta": 1,
+        "task_delta": 1,
+        "task": {
+          "id": "task_c58ba4221ec9fedf09c3f867933b9748",
+          "text": "提醒：准备 Orion 评审材料。",
+          "due_at": "2026-10-20T01:22:20+00:00",
+          "status": "scheduled",
+          "delivery_id": ""
+        },
+        "task_target": {
+          "provider": "slack",
+          "thread_id": "1792500003.000001",
+          "channel_id": "C_SOP_BASE",
+          "message_id": "1792500003.000001",
+          "installation_id": "sop-synthetic"
+        },
+        "run_id": "r_8337b62e4d3e5c6b9996ea766b619938",
+        "runtime_session_id": "s_96ccdcf023e2fb5d97de957e41bae31c",
+        "runtime_status": "completed",
+        "runtime_usage": {
+          "compute_seconds": 0,
+          "tokens_in": 1964,
+          "tokens_out": 207,
+          "tokens_total": 2171,
+          "usage_unknown": false
+        },
+        "runtime_calls": [
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:21.030168Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:21.029413Z",
+            "result_at": "2026-10-20T01:19:23.780918Z",
+            "state": "result",
+            "step": 0,
+            "tokens_in": 865,
+            "tokens_out": 137,
+            "usage_partial": false,
+            "usage_unknown": false
+          },
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:23.841274Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:23.840585Z",
+            "result_at": "2026-10-20T01:19:26.386143Z",
+            "state": "result",
+            "step": 1,
+            "tokens_in": 1099,
+            "tokens_out": 70,
+            "usage_partial": false,
+            "usage_unknown": false
+          }
+        ],
+        "llm_call_count": 2,
+        "sink_receipts": [
+          {
+            "ts": "1792459166.000007",
+            "text": "已记住：Orion 评审改到 2026-10-22 16:00。\n\n已安排在 3 分钟后（2026-10-20 09:22:20，Asia/Shanghai）提醒你准备评审材料。提醒目前已保存并等待到点发送。",
+            "client_msg_id": "a5ec61b0-ec9b-5f07-a0eb-2386c2493b58"
+          }
+        ],
+        "duration_seconds": 6.64
+      },
+      "candidate": {
+        "pass": false,
+        "failures": [
+          "final missing any of ['尚未送达', '未送达', '不表示已送达', '不代表已送达']"
+        ],
+        "final": "已记住：Orion 评审改到 2026-10-22 16:00。\n\n并已安排在 3 分钟后（2026-10-20 09:22:26，Asia/Shanghai）提醒你准备评审材料。提醒目前已保存，待渠道发送。",
+        "tools": [
+          "remember",
+          "create_reminder"
+        ],
+        "knowledge_delta": 1,
+        "task_delta": 1,
+        "task": {
+          "id": "task_c3a085b5f7ee44f613627306cf8dacc2",
+          "text": "提醒：准备 Orion 评审材料。",
+          "due_at": "2026-10-20T01:22:26+00:00",
+          "status": "scheduled",
+          "delivery_id": ""
+        },
+        "task_target": {
+          "provider": "slack",
+          "thread_id": "1792500003.000001",
+          "channel_id": "C_SOP_CAND",
+          "message_id": "1792500003.000001",
+          "installation_id": "sop-synthetic"
+        },
+        "run_id": "r_28a53c41d3de216d5745d9a3e8d638e3",
+        "runtime_session_id": "s_e832adb14db46793a167cc467788f8f6",
+        "runtime_status": "completed",
+        "runtime_usage": {
+          "compute_seconds": 0,
+          "tokens_in": 2028,
+          "tokens_out": 217,
+          "tokens_total": 2245,
+          "usage_unknown": false
+        },
+        "runtime_calls": [
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:27.03359Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:27.032139Z",
+            "result_at": "2026-10-20T01:19:30.234292Z",
+            "state": "result",
+            "step": 0,
+            "tokens_in": 898,
+            "tokens_out": 147,
+            "usage_partial": false,
+            "usage_unknown": false
+          },
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:30.296502Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:30.295903Z",
+            "result_at": "2026-10-20T01:19:32.827711Z",
+            "state": "result",
+            "step": 1,
+            "tokens_in": 1130,
+            "tokens_out": 70,
+            "usage_partial": false,
+            "usage_unknown": false
+          }
+        ],
+        "llm_call_count": 2,
+        "sink_receipts": [
+          {
+            "ts": "1792459172.000008",
+            "text": "已记住：Orion 评审改到 2026-10-22 16:00。\n\n并已安排在 3 分钟后（2026-10-20 09:22:26，Asia/Shanghai）提醒你准备评审材料。提醒目前已保存，待渠道发送。",
+            "client_msg_id": "0240f4c1-a6a8-553c-befb-705bad9318cd"
+          }
+        ],
+        "duration_seconds": 6.37
+      }
+    },
+    "ambiguous_time": {
+      "baseline": {
+        "pass": true,
+        "failures": [],
+        "final": "请问明天几点提醒你开会？（组织时区为上海时间；明天是 10 月 21 日。）",
+        "tools": [],
+        "knowledge_delta": 0,
+        "task_delta": 0,
+        "task": null,
+        "task_target": null,
+        "run_id": "r_7fbce5d53661fae5f9afa7467fba8057",
+        "runtime_session_id": "s_b00321a7b1b7e8617860d0b5f60327e5",
+        "runtime_status": "completed",
+        "runtime_usage": {
+          "compute_seconds": 0,
+          "tokens_in": 836,
+          "tokens_out": 62,
+          "tokens_total": 898,
+          "usage_unknown": false
+        },
+        "runtime_calls": [
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:34.048684Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:34.04753Z",
+            "result_at": "2026-10-20T01:19:36.103546Z",
+            "state": "result",
+            "step": 0,
+            "tokens_in": 836,
+            "tokens_out": 62,
+            "usage_partial": false,
+            "usage_unknown": false
+          }
+        ],
+        "llm_call_count": 1,
+        "sink_receipts": [
+          {
+            "ts": "1792459176.000009",
+            "text": "请问明天几点提醒你开会？（组织时区为上海时间；明天是 10 月 21 日。）",
+            "client_msg_id": "4e646dfa-6c59-5b25-a07f-ef789403d05c"
+          }
+        ],
+        "duration_seconds": 3.33
+      },
+      "candidate": {
+        "pass": true,
+        "failures": [],
+        "final": "明天几点开会？请提供具体时间，我再为你安排提醒。",
+        "tools": [],
+        "knowledge_delta": 0,
+        "task_delta": 0,
+        "task": null,
+        "task_target": null,
+        "run_id": "r_47e207f5ef0a4c826e0397436b8ce80c",
+        "runtime_session_id": "s_e84b0a3baafd17387b5ae83708eb1401",
+        "runtime_status": "completed",
+        "runtime_usage": {
+          "compute_seconds": 0,
+          "tokens_in": 869,
+          "tokens_out": 45,
+          "tokens_total": 914,
+          "usage_unknown": false
+        },
+        "runtime_calls": [
+          {
+            "dispatch_seq": 1,
+            "dispatched_at": "2026-10-20T01:19:37.037054Z",
+            "err": "",
+            "kind": "llm",
+            "prepared_at": "2026-10-20T01:19:37.036065Z",
+            "result_at": "2026-10-20T01:19:39.810806Z",
+            "state": "result",
+            "step": 0,
+            "tokens_in": 869,
+            "tokens_out": 45,
+            "usage_partial": false,
+            "usage_unknown": false
+          }
+        ],
+        "llm_call_count": 1,
+        "sink_receipts": [
+          {
+            "ts": "1792459179.000010",
+            "text": "明天几点开会？请提供具体时间，我再为你安排提醒。",
+            "client_msg_id": "c52fe64b-5bd1-52a2-8bed-df528809ccce"
+          }
+        ],
+        "duration_seconds": 3.59
+      }
+    }
+  },
+  "reminders": {
+    "baseline": {
+      "task_id": "task_c58ba4221ec9fedf09c3f867933b9748",
+      "state": "confirmed",
+      "text": "提醒：准备 Orion 评审材料。",
+      "provider_message_id": "1792459340.000011",
+      "sink_receipts": [
+        {
+          "ts": "1792459166.000007",
+          "text": "已记住：Orion 评审改到 2026-10-22 16:00。\n\n已安排在 3 分钟后（2026-10-20 09:22:20，Asia/Shanghai）提醒你准备评审材料。提醒目前已保存并等待到点发送。",
+          "client_msg_id": "a5ec61b0-ec9b-5f07-a0eb-2386c2493b58"
+        },
+        {
+          "ts": "1792459340.000011",
+          "text": "提醒：准备 Orion 评审材料。",
+          "client_msg_id": "15a848d2-9aa7-5c5a-8a52-338dd8505ca0"
+        }
+      ]
+    },
+    "candidate": {
+      "task_id": "task_c3a085b5f7ee44f613627306cf8dacc2",
+      "state": "confirmed",
+      "text": "提醒：准备 Orion 评审材料。",
+      "provider_message_id": "1792459346.000012",
+      "sink_receipts": [
+        {
+          "ts": "1792459172.000008",
+          "text": "已记住：Orion 评审改到 2026-10-22 16:00。\n\n并已安排在 3 分钟后（2026-10-20 09:22:26，Asia/Shanghai）提醒你准备评审材料。提醒目前已保存，待渠道发送。",
+          "client_msg_id": "0240f4c1-a6a8-553c-befb-705bad9318cd"
+        },
+        {
+          "ts": "1792459346.000012",
+          "text": "提醒：准备 Orion 评审材料。",
+          "client_msg_id": "6f579b33-181f-5366-a5d8-b1ba83955076"
+        }
+      ]
+    }
+  },
+  "cost": {
+    "baseline": {
+      "llm_calls": 9,
+      "tokens_total_from_runs": 9277,
+      "proposal_cost_excluded": true
+    },
+    "candidate": {
+      "llm_calls": 9,
+      "tokens_total_from_runs": 9525,
+      "proposal_cost_excluded": true
+    },
+    "proposal": {
+      "run_id": "r_986950cb962bee589d8f7cee5167c6e5",
+      "usage": {
+        "compute_seconds": 0,
+        "tokens_in": 0,
+        "tokens_out": 0,
+        "tokens_total": 827,
+        "usage_unknown": false
+      },
+      "excluded_from_eval_arm_totals": true
+    },
+    "verification": {
+      "run_id": "r_32013c8db2a87b38449bb06622c5ed3d",
+      "llm_calls": 2,
+      "tokens_total": 2265,
+      "included_in_release_gate": true
+    }
+  },
+  "decision": {
+    "actor": "user",
+    "at": "2026-10-20T09:23:44+08:00",
+    "decision": "approved",
+    "reason": "Target case improved from listing the retired record to only the current record/source; no candidate-only guard regression; shared reminder checker phrase limitation noted.",
+    "candidate_instructions_sha256": "8666855e5abcee9ca37facfb47245f190c1e52e1ab2518163aa2076d5d4bf8e6"
+  },
+  "publish": {
+    "endpoint": "PUT /api/tenants/bots-slack-g1/bots/bingdi/config",
+    "at": "2026-10-20T09:23:58+08:00",
+    "expected_revision": 1,
+    "status": 200,
+    "response_revision": 2,
+    "runtime_agent_id": "a_e1497669fad0ed9b218226e99bdea64d",
+    "config_hash": "8f2dc0e003c5de9e56db5e60ac7e02bb2eac3fc977e677af76488bbf82b5b4ad",
+    "baseline_config_hash": "355fb18d637bb9b0199fc5aa292648f9e088fa1f19393857838b75d2bdd1003d",
+    "requested_instructions_sha256": "8666855e5abcee9ca37facfb47245f190c1e52e1ab2518163aa2076d5d4bf8e6",
+    "changed_fields": [
+      "instructions"
+    ]
+  },
+  "feedback": {
+    "verdict": "pass",
+    "verified_at": "2026-10-20T09:26:10+08:00",
+    "channel": "configured private test channel",
+    "thread_ts": "1792459562.268879",
+    "inbox_id": "inbox_d514b4dc9c4104a766962b449de4d802",
+    "run_id": "r_32013c8db2a87b38449bb06622c5ed3d",
+    "session_id": "s_487df3700a4a8e5376ea2ca8335b37f8",
+    "runtime_agent_id": "a_e1497669fad0ed9b218226e99bdea64d",
+    "session_revision": 2,
+    "delivery_id": "delivery_final_28fc888024a29e66c4c052f36b421fd9",
+    "provider_message_id": "1792459570.858859",
+    "final": "真实 Slack 重启验收记录：日期 **2026-10-20**，代码 **b4e8ee3**。  \n来源：`slack_message_e9cfd288ffaa38ebfac1ee0a2be7037d`。",
+    "final_contains": [
+      "2026-10-20",
+      "b4e8ee3",
+      "slack_message_e9cfd288ffaa38ebfac1ee0a2be7037d"
+    ],
+    "final_not_contains": [
+      "Bingdi",
+      "slack_message_f2a90bbac6d52000fe7ec3c3ca49b65e"
+    ],
+    "llm_calls": 2,
+    "usage": {
+      "compute_seconds": 0,
+      "tokens_in": 2183,
+      "tokens_out": 82,
+      "tokens_total": 2265,
+      "usage_unknown": false
+    },
+    "old_thread_sessions_still_revision": 1,
+    "rollback": null
+  },
+  "arms": {
+    "baseline": {
+      "tenant": "bots-sop-3008ad9c-base",
+      "channel": "C_SOP_BASE",
+      "port": 18191
+    },
+    "candidate": {
+      "tenant": "bots-sop-3008ad9c-cand",
+      "channel": "C_SOP_CAND",
+      "port": 18192
+    }
+  },
+  "notes": [
+    "separate isolated tenants/identities/channels; only instructions differ among behavior settings",
+    "no real Slack credentials reach either arm; the sink is a counting test provider",
+    "proposal run is in the real tenant but has no tools or Bots state"
+  ],
+  "errors": [],
+  "initial_state": {
+    "baseline": [
+      {
+        "id": "knowledge_ab2bc285d782dc8ca8a541a1632dd1b8",
+        "content": "真实 Slack 重启验收的初版记录：计划日期是 2026-10-18。",
+        "source_id": "sop_fixture_restart_draft"
+      },
+      {
+        "id": "knowledge_6774d685cf478d562be90c28eb10d3b3",
+        "content": "真实 Slack 重启验收，日期 2026-10-20，代码 b4e8ee3。",
+        "source_id": "sop_fixture_restart_review"
+      },
+      {
+        "id": "knowledge_f63d8da05f0185dec5842e445ffb3591",
+        "content": "Orion 评审时间是 2026-10-21 15:00（Asia/Shanghai）。",
+        "source_id": "sop_fixture_orion_review"
+      }
+    ],
+    "candidate": [
+      {
+        "id": "knowledge_21b40d2bc92f42cabbc04e5c4c62912a",
+        "content": "真实 Slack 重启验收的初版记录：计划日期是 2026-10-18。",
+        "source_id": "sop_fixture_restart_draft"
+      },
+      {
+        "id": "knowledge_05b2c75247f98062da22e1633fd0c89e",
+        "content": "真实 Slack 重启验收，日期 2026-10-20，代码 b4e8ee3。",
+        "source_id": "sop_fixture_restart_review"
+      },
+      {
+        "id": "knowledge_75cf972dc7ce8ac2272b3ab71fb2f94f",
+        "content": "Orion 评审时间是 2026-10-21 15:00（Asia/Shanghai）。",
+        "source_id": "sop_fixture_orion_review"
+      }
+    ]
+  },
+  "summary": {
+    "target_baseline_pass": false,
+    "target_candidate_pass": true,
+    "target_baseline_failures": [
+      "final contains forbidden '2026-10-18'",
+      "final contains forbidden '初版'"
+    ],
+    "target_candidate_failures": [],
+    "candidate_guard_failures": {
+      "reminder_relative": [
+        "final missing any of ['尚未送达', '未送达', '不表示已送达', '不代表已送达']"
+      ]
+    },
+    "all_arms_completed": true,
+    "paired": {
+      "target_improvement": true,
+      "candidate_only_guard_failures": [],
+      "shared_guard_failures": [
+        "reminder_relative"
+      ],
+      "baseline_only_guard_failures": [
+        "single_recall"
+      ]
+    },
+    "published_revision": 2,
+    "real_verification_pass": true,
+    "rollback": null
+  },
+  "product_code_commit": "30b0dfa1cd31d093089ba08ebc824196353026b1",
+  "analysis_notes": [
+    "Pilot v1 target case did not reproduce the baseline extra-record behavior; it was discarded and the final v2 fixture was frozen before candidate v2 generation. Pilot report SHA-256 5b35f0b84e8bad416fb20c8315ec4932d02e62e2910b3f94e53f60527ff058a8.",
+    "single_recall baseline answered \"2026 年 10 月 21 日\" (semantically correct); the frozen checker requires ISO \"2026-10-21\". This baseline-only failure is a checker-format limitation, not a wrong answer.",
+    "reminder_relative: both arms state the reminder is saved/pending (\"等待到点发送\" / \"待渠道发送\") and task/text/due/tool checks pass; the frozen checker phrase list is narrower. It is a shared failure and not a candidate regression.",
+    "The target trace_recall difference is real: baseline lists the retired 2026-10-18 record; candidate lists only the 2026-10-20 record, its code and source.",
+    "The candidate proposal run is in the real tenant but has no tools, no Bots bridge and no native state; it is excluded from arm cost totals."
+  ],
+  "rollback": null,
+  "verification": {
+    "source": "real Slack new thread after CAS publication",
+    "verdict": "pass",
+    "verified_at": "2026-10-20T09:26:10+08:00",
+    "channel": "configured private test channel",
+    "thread_ts": "1792459562.268879",
+    "inbox_id": "inbox_d514b4dc9c4104a766962b449de4d802",
+    "run_id": "r_32013c8db2a87b38449bb06622c5ed3d",
+    "session_id": "s_487df3700a4a8e5376ea2ca8335b37f8",
+    "runtime_agent_id": "a_e1497669fad0ed9b218226e99bdea64d",
+    "session_revision": 2,
+    "delivery_id": "delivery_final_28fc888024a29e66c4c052f36b421fd9",
+    "provider_message_id": "1792459570.858859",
+    "final": "真实 Slack 重启验收记录：日期 **2026-10-20**，代码 **b4e8ee3**。  \n来源：`slack_message_e9cfd288ffaa38ebfac1ee0a2be7037d`。",
+    "final_contains": [
+      "2026-10-20",
+      "b4e8ee3",
+      "slack_message_e9cfd288ffaa38ebfac1ee0a2be7037d"
+    ],
+    "final_not_contains": [
+      "Bingdi",
+      "slack_message_f2a90bbac6d52000fe7ec3c3ca49b65e"
+    ],
+    "llm_calls": 2,
+    "usage": {
+      "compute_seconds": 0,
+      "tokens_in": 2183,
+      "tokens_out": 82,
+      "tokens_total": 2265,
+      "usage_unknown": false
+    },
+    "old_thread_sessions_still_revision": 1,
+    "rollback": null
+  }
+}

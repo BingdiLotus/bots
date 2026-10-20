@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>组织 Bot 管理 · Bingdi Bots</title>
+  <link rel="stylesheet" href="/admin/style.css">
+  <script src="/admin/app.js" defer></script>
+</head>
+<body>
+<div id="console-root" class="shell" data-tenant="{{.TenantID}}">
+  <header class="page-header">
+    <div>
+      <p class="brand">Bingdi Bots</p>
+      <h1>组织 Bot 管理</h1>
+      <p class="muted">配置工作方式，查看原生知识、任务和回执。</p>
+    </div>
+    <div class="header-actions">
+      <span class="tenant">组织 <strong id="tenant-label">{{.TenantID}}</strong></span>
+      <button id="logout-button" class="button secondary" type="button" hidden>退出登录</button>
+    </div>
+  </header>
+
+  <noscript><p class="notice error">此管理页需要启用 JavaScript。业务接口仍需管理员访问凭据。</p></noscript>
+  <section id="auth-panel" class="login-panel" aria-labelledby="login-heading">
+    <h2 id="login-heading">管理员登录</h2>
+    <p class="muted">访问凭据仅保留在本页内存，退出或刷新后需重新输入。</p>
+    <form id="login-form" method="post" action="/admin" autocomplete="off">
+      <label for="admin-token">管理员访问凭据</label>
+      <div class="login-fields">
+        <input id="admin-token" type="password" required autocomplete="off" spellcheck="false" aria-describedby="auth-error">
+        <button id="login-button" class="button primary" type="submit">登录</button>
+      </div>
+    </form>
+    <p id="auth-error" class="error-text" role="alert" hidden></p>
+  </section>
+
+  <main id="workspace" hidden>
+    <div class="bot-toolbar">
+      <div class="bot-picker">
+        <label for="bot-select">组织 Bot</label>
+        <select id="bot-select" aria-label="选择组织 Bot"></select>
+      </div>
+      <button id="refresh-bots" class="button secondary" type="button">刷新列表</button>
+    </div>
+    <p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
+    <section id="empty-bots" class="empty-panel" hidden>
+      <h2>尚未导入组织 Bot</h2>
+      <p class="muted">完成初始配置后，点击“刷新列表”查看。</p>
+    </section>
+
+    <div id="bot-content" hidden>
+      <section class="bot-summary" aria-labelledby="bot-name">
+        <div>
+          <h2 id="bot-name"></h2>
+          <p id="bot-identity" class="mono muted"></p>
+          <p id="bot-status" class="status-line"></p>
+        </div>
+        <div class="summary-actions">
+          <button id="toggle-bot" class="button secondary" type="button"></button>
+          <button id="toggle-account" class="button secondary" type="button"></button>
+        </div>
+      </section>
+      <p class="hint">暂停会阻止新执行和新发送；已在途结果仍会记入回执。</p>
+
+      <div class="content-grid">
+        <section class="configuration" aria-labelledby="config-heading">
+          <div class="section-heading">
+            <h2 id="config-heading">工作配置</h2>
+            <span id="config-revision" class="muted"></span>
+          </div>
+          <form id="config-form">
+            <fieldset id="config-fields">
+              <legend class="sr-only">人格、模型与执行限额</legend>
+              <label for="instructions">人格与 SOP</label>
+              <textarea id="instructions" rows="7" required></textarea>
+              <div class="form-grid">
+                <div><label for="model">模型</label><input id="model" required autocomplete="off"></div>
+                <div><label for="timezone">组织时区</label><input id="timezone" required autocomplete="off" placeholder="Asia/Shanghai"></div>
+                <div><label for="max-output-tokens">单次输出 token 上限</label><input id="max-output-tokens" type="number" min="1" step="1" required></div>
+                <div><label for="max-steps">执行步数上限</label><input id="max-steps" type="number" min="1" step="1" required></div>
+                <div><label for="max-duration-seconds">运行时限（秒）</label><input id="max-duration-seconds" type="number" min="0.001" step="0.001" required></div>
+                <div><label for="max-pending-tasks">未完成提醒上限</label><input id="max-pending-tasks" type="number" min="1" step="1" required></div>
+              </div>
+              <p class="hint">unknown 和 blocked 提醒仍占用数量额度。新配置用于新会话，已有会话保留原版本。</p>
+              <div class="form-actions">
+                <button id="save-config" class="button primary" type="submit">保存为新版本</button>
+                <button id="reload-config" class="button secondary" type="button">重新读取</button>
+              </div>
+            </fieldset>
+          </form>
+          <details class="bindings">
+            <summary>账号与接入绑定 · 只读</summary>
+            <p class="hint">初始化时固定的账号、路由和凭据引用。这里不展示凭据值。</p>
+            <dl id="binding-details"></dl>
+          </details>
+        </section>
+
+        <section class="records" aria-labelledby="records-heading">
+          <div class="section-heading"><h2 id="records-heading">原生状态与审计</h2></div>
+          <div id="records-tabs" class="tabs" role="tablist" aria-label="记录类型">
+            <button id="tab-knowledge" role="tab" aria-selected="true" aria-controls="records-panel" data-kind="knowledge" type="button">知识</button>
+            <button id="tab-tasks" role="tab" aria-selected="false" aria-controls="records-panel" data-kind="tasks" type="button" tabindex="-1">任务</button>
+            <button id="tab-deliveries" role="tab" aria-selected="false" aria-controls="records-panel" data-kind="deliveries" type="button" tabindex="-1">发送回执</button>
+            <button id="tab-audit" role="tab" aria-selected="false" aria-controls="records-panel" data-kind="audit" type="button" tabindex="-1">审计</button>
+          </div>
+          <form id="records-filter-form" class="filter-form">
+            <div><label for="scope-filter">范围 scope_id（可选）</label><input id="scope-filter" autocomplete="off" placeholder="留空查看此 Bot 的全部授权范围"></div>
+            <button id="refresh-records" class="button secondary" type="submit">刷新</button>
+          </form>
+          <p class="hint receipt-note">confirmed 表示平台已接受并保存消息标识，不表示已读。unknown 结果未知，需核对；rejected 表示明确拒绝。</p>
+          <div id="records-panel" role="tabpanel" aria-labelledby="tab-knowledge">
+            <p id="records-status" class="muted" role="status" aria-live="polite"></p>
+            <div class="table-wrap">
+              <table id="records-table">
+                <caption id="records-caption" class="sr-only">知识记录</caption>
+                <thead id="records-head"></thead>
+                <tbody id="records-body"></tbody>
+              </table>
+            </div>
+            <p id="records-empty" class="empty-records" hidden></p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+  <footer>成员继续在 Slack 中交互；此处用于组织 Bot 的配置和状态管理。</footer>
+</div>
+</body>
+</html>

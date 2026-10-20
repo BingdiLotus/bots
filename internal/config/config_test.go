@@ -7,6 +7,7 @@ import (
 )
 
 func TestLoadDefaults(t *testing.T) {
+	t.Setenv("BOTS_DATABASE_URL", "postgres://test:test@localhost/bots_test")
 	t.Setenv("BOTS_HTTP_ADDR", "")
 	t.Setenv("BOTS_SHUTDOWN_TIMEOUT", "")
 	cfg, err := Load()
@@ -19,6 +20,7 @@ func TestLoadDefaults(t *testing.T) {
 }
 
 func TestLoadOverrides(t *testing.T) {
+	t.Setenv("BOTS_DATABASE_URL", "postgres://test:test@localhost/bots_test")
 	t.Setenv("BOTS_HTTP_ADDR", ":9090")
 	t.Setenv("BOTS_SHUTDOWN_TIMEOUT", "2s")
 	cfg, err := Load()

@@ -1,7 +1,13 @@
 /bin/
+/bots
 /coverage.out
 .env
 .env.*
 !.env.example
 *.log
 .DS_Store
+/configs/bot.yaml
+__pycache__/
+*.pyc
+
+/backups/

@@ -1,0 +1,28 @@
+tenant_id: bots-dev
+id: team-assistant
+name: 团队助手
+enabled: true
+account_enabled: true
+config:
+  model: claude-sonnet-4-6
+  timezone: Asia/Shanghai
+  instructions: |
+    你是组织拥有的团队助手。按成员明确要求保存知识、检索已有知识或安排提醒。
+    保存事实时记录原意，不凭空推断。时间不明确时先询问；工具报错时如实说明。
+    提醒创建成功表示已保存安排，不表示消息已送达。遵守组织策略与工具范围。
+  channel_kind: slack
+  event_transport: webhook
+  installation_id: slack-dev
+  workspace_id: T_REPLACE
+  bot_user_id: U_REPLACE
+  channel_id: C_REPLACE
+  token_env: SLACK_BOT_TOKEN
+  signing_secret_env: SLACK_SIGNING_SECRET
+  # For an installed Socket Mode app: event_transport: socket,
+  # app_token_env: SLACK_APP_TOKEN. No signing secret is needed for that ingress.
+  bridge_ref: bots-native
+  timer_target_ref: bots-timers
+  max_output_tokens: 4096
+  max_steps: 16
+  max_duration_ms: 300000
+  max_pending_tasks: 20
