@@ -54,7 +54,7 @@
 - 2026-10-21：MVP 主链收口。停 test-only Lab A/B，启动 `bots-trial`；停用全栈演练知识（active knowledge 0），主线最终 smoke run `r_2ba155d6…`，final “主链可用” confirmed，真实 ts `1792537359.744669`；trial healthy/readyz 200。G0/G1/G2、P0 技术项和主线 smoke 已收口；剩余 owner/opt-in/指标/回滚、admin token 轮换、metrics/告警和 push/CI。
 - 2026-10-20：P0 **技术项完成**：Slack scopes、unknown 处置、权限撤回、Docker trial、独立频道/tenant、D1/D2/D3 与同窗口全栈恢复均通过。剩余 trial owner/opt-in/指标/回滚确认和可选 systemd；Docker trial 已上线。见[P0 上线准备证据](evidence/P0-上线准备-2026-10-20.md)。
 
-- 2026-10-21：可观测性最小实现（分支 `feat/trial-observability`）：`/metrics` 暴露 `bots_up/ready`、inbox/task/delivery 状态计数和 active knowledge；`scripts/trial-health.sh` 巡检 ready/unknown/rejected。未包含文本、token 或 Slack ID；阈值/owner 仍待确认。
+- 2026-10-21：可观测性最小实现（PR #2，main CI `39515748812`）：`/metrics` 暴露 `bots_up/ready`、inbox/task/delivery 状态计数和 active knowledge；`scripts/trial-health.sh` 巡检 ready/unknown/rejected。镜像 `bingdi-bots:mvp-20261021-metrics` 已部署 trial，metrics healthy/readyz 200，trial-health 退出 0。未包含文本、token 或 Slack ID；阈值/owner 仍待确认。详见[试用可观测性证据](evidence/试用可观测性-2026-10-21.md)。
 
 ## 当前部署与下一步
 
