@@ -6,7 +6,7 @@
 
 | 角色 | Slack 身份 | Bots tenant/bot | 端口 | Slack App |
 |---|---|---|---|---|
-| Lab A（现有） | `bingdi` | `bots-lab-a` / `bingdi-a` | 8091 | 现有 `REDACTED_APP_A` |
+| Lab A（现有） | `bingdi` | `bots-lab-a` / `bingdi-a` | 8091 | 现有 app（本地配置） |
 | Lab B（新增） | `bingdi-b` | `bots-lab-b` / `bingdi-b` | 8092 | 新建 test-only app，manifest 见 `deploy/slack-lab-b.manifest.json` |
 
 两个 Bot 同一私有频道 `#bingdi-bots-lab`，各自一个 Bots 容器、tenant key、Chronotope bridge/timer。Trial 的 `bots-trial` 与 Lab A 使用同一个 Slack app token，不能同时运行；跑 Lab 时暂停 trial，结束后恢复。Lab B 使用独立 app/token。

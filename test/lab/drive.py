@@ -19,8 +19,6 @@ import sys
 import time
 import urllib.request
 
-DEFAULT_CHANNEL = "REDACTED_LAB_CHANNEL"
-DEFAULT_TARGET = "REDACTED_BOT_USER_A"
 DEFAULT_DRIVER_ENV = pathlib.Path.home() / ".config/bots/lab-b/env"
 DEFAULT_REPO_ENV = pathlib.Path(__file__).resolve().parents[2] / ".env"
 
@@ -87,8 +85,8 @@ def deliveries(dsn, tenants=("bots-lab-a", "bots-lab-b")):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--channel", default=DEFAULT_CHANNEL)
-    parser.add_argument("--target-user", default=DEFAULT_TARGET)
+    parser.add_argument("--channel", default=None, help="defaults to LAB_CHANNEL_ID in the driver env")
+    parser.add_argument("--target-user", default=None, help="defaults to LAB_TARGET_USER in the driver env")
     parser.add_argument("--driver-env", default=str(DEFAULT_DRIVER_ENV))
     parser.add_argument("--repo-env", default=str(DEFAULT_REPO_ENV))
     parser.add_argument("--max-wait", type=int, default=120)
@@ -100,21 +98,25 @@ def main():
     repo = load_env(args.repo_env)
     token = driver.get("SLACK_BOT_TOKEN_B")
     dsn = repo.get("BOTS_DATABASE_URL")
+    channel = args.channel or driver.get("LAB_CHANNEL_ID")
+    target = args.target_user or driver.get("LAB_TARGET_USER")
     if not token or not dsn:
         raise SystemExit("missing lab B token or Bots database URL")
+    if not channel or not target:
+        raise SystemExit("provide --channel/--target-user or LAB_CHANNEL_ID/LAB_TARGET_USER")
     budget_a = load_env(pathlib.Path.home() / ".config/bots/lab-a/env").get("BOTS_TEST_MAX_PEER_ROUNDS", "0")
     budget_b = driver.get("BOTS_TEST_MAX_PEER_ROUNDS", "0")
     prompt = (
-        "<@" + args.target_user + "> 请与 bingdi-b 做一次状态互检：先说明 A 在线，"
+        "<@" + target + "> 请与 bingdi-b 做一次状态互检：先说明 A 在线，"
         "再请 B 给出结论；按实验室预算进行，不要无限循环。"
     )
-    print("channel", args.channel, "target", args.target_user, "budgets", budget_a + "/" + budget_b)
+    print("channel", channel, "target", target, "budgets", budget_a + "/" + budget_b)
     if args.dry_run:
         print("dry-run prompt:", prompt)
         return 0
 
     before = counts(dsn)
-    ts = slack_post(token, args.channel, prompt)
+    ts = slack_post(token, channel, prompt)
     root_ts = ts
     print("driver_ts", ts, "attempts", args.attempts, "before", before)
     last = dict(before)
@@ -136,8 +138,8 @@ def main():
     for attempt in range(2, args.attempts + 1):
         if time.time() >= deadline:
             break
-        text = "<@" + args.target_user + "> 第 " + str(attempt) + " 轮检查请求：请再次确认状态；只回复本轮。"
-        reply_ts = slack_post(token, args.channel, text, thread_ts=root_ts)
+        text = "<@" + target + "> 第 " + str(attempt) + " 轮检查请求：请再次确认状态；只回复本轮。"
+        reply_ts = slack_post(token, channel, text, thread_ts=root_ts)
         print("driver_ts", reply_ts, "attempt", attempt)
         last = wait_for_a_delta(last["bots-lab-a"], timeout=30)
     print("final", last, "delta", {t: last[t] - before[t] for t in last})
