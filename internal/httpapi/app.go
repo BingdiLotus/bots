@@ -37,6 +37,7 @@ type Store interface {
 	ListDeliveries(context.Context, domain.Scope, int) ([]domain.Delivery, error)
 	ResolveDelivery(context.Context, domain.Scope, string, string, string, string) (domain.Delivery, error)
 	ListAudit(context.Context, domain.Scope, int) ([]domain.AuditEvent, error)
+	Metrics(context.Context, string) (domain.Metrics, error)
 }
 
 type App struct {
@@ -90,6 +91,7 @@ func (a *App) recordPeerRound(event slack.Event) {
 func (a *App) Register(mux *http.ServeMux) {
 	a.registerConsole(mux)
 	mux.HandleFunc("GET /readyz", a.readyz)
+	mux.HandleFunc("GET /metrics", a.metrics)
 	mux.HandleFunc("POST /internal/tools", a.executeTool)
 	mux.HandleFunc("POST /internal/timer-fires", a.acceptTimerFire)
 	mux.HandleFunc("GET /api/tenants/{tenant}/bots", a.listBots)

@@ -33,6 +33,8 @@ type appStore struct {
 	queries          []string
 	mutations        []string
 	resolved         []string
+	metrics          domain.Metrics
+	metricsTenant    string
 	mutationID       string
 	expectedRevision int
 	getBotCalls      int
@@ -116,6 +118,10 @@ func (s *appStore) ListDeliveries(_ context.Context, scope domain.Scope, n int) 
 func (s *appStore) ListAudit(_ context.Context, scope domain.Scope, n int) ([]domain.AuditEvent, error) {
 	s.recordQuery("audit", scope, n)
 	return nil, s.err
+}
+func (s *appStore) Metrics(_ context.Context, tenant string) (domain.Metrics, error) {
+	s.metricsTenant = tenant
+	return s.metrics, s.err
 }
 func (s *appStore) ResolveDelivery(_ context.Context, scope domain.Scope, id, resolution, providerMessageID, note string) (domain.Delivery, error) {
 	s.resolved = append(s.resolved, id+"|"+resolution+"|"+providerMessageID+"|"+note)

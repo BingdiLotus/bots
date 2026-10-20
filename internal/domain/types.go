@@ -209,6 +209,15 @@ type AuditEvent struct {
 	CreatedAt time.Time       `json:"created_at"`
 }
 
+// Metrics is the small, non-secret trial snapshot exposed on the loopback
+// metrics endpoint. State maps are current gauges, not billing counters.
+type Metrics struct {
+	Inbox           map[string]int `json:"inbox"`
+	Tasks           map[string]int `json:"tasks"`
+	Deliveries      map[string]int `json:"deliveries"`
+	KnowledgeActive int            `json:"knowledge_active"`
+}
+
 type ToolContext struct {
 	TenantID        string `json:"tenant_id"`
 	SubjectRef      string `json:"subject_ref"`
