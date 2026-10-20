@@ -205,6 +205,37 @@ func (a *App) getTask(w http.ResponseWriter, r *http.Request) {
 	replyJSON(w, 200, task)
 }
 
+// resolveDelivery records an administrator's manual verification of an
+// ambiguous send. It never calls the provider or retries the send.
+func (a *App) resolveDelivery(w http.ResponseWriter, r *http.Request) {
+	scope, ok := a.botScope(w, r)
+	if !ok {
+		return
+	}
+	var input struct {
+		State             string `json:"state"`
+		ProviderMessageID string `json:"provider_message_id"`
+		Note              string `json:"note"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	if input.State != "confirmed" && input.State != "rejected" {
+		replyError(w, 400, "invalid_request", "state must be confirmed or rejected")
+		return
+	}
+	delivery, err := a.Store.ResolveDelivery(r.Context(), scope, r.PathValue("delivery"), input.State, input.ProviderMessageID, input.Note)
+	if err != nil {
+		replyStoreError(w, err)
+		return
+	}
+	if delivery.TenantID != scope.TenantID || delivery.BotID != scope.BotID || scope.ScopeID != "" && delivery.ScopeID != scope.ScopeID {
+		replyError(w, 500, "internal_error", "delivery result could not be read")
+		return
+	}
+	replyJSON(w, 200, delivery)
+}
+
 func (a *App) deactivateKnowledge(w http.ResponseWriter, r *http.Request) {
 	scope, ok := a.botScope(w, r)
 	if !ok {

@@ -33,6 +33,7 @@ type Store interface {
 	GetTask(context.Context, domain.Scope, string) (domain.Task, error)
 	ListTasks(context.Context, domain.Scope, int) ([]domain.Task, error)
 	ListDeliveries(context.Context, domain.Scope, int) ([]domain.Delivery, error)
+	ResolveDelivery(context.Context, domain.Scope, string, string, string, string) (domain.Delivery, error)
 	ListAudit(context.Context, domain.Scope, int) ([]domain.AuditEvent, error)
 }
 
@@ -61,6 +62,7 @@ func (a *App) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/tenants/{tenant}/bots/{bot}/tasks", a.listRecords)
 	mux.HandleFunc("GET /api/tenants/{tenant}/bots/{bot}/tasks/{task}", a.getTask)
 	mux.HandleFunc("GET /api/tenants/{tenant}/bots/{bot}/deliveries", a.listRecords)
+	mux.HandleFunc("POST /api/tenants/{tenant}/bots/{bot}/deliveries/{delivery}/resolve", a.resolveDelivery)
 	mux.HandleFunc("GET /api/tenants/{tenant}/bots/{bot}/audit", a.listRecords)
 	mux.HandleFunc("POST /channels/slack/{tenant}/{bot}/events", a.slackEvents)
 }

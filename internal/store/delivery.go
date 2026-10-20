@@ -220,6 +220,66 @@ func (s *Store) CompleteDelivery(ctx context.Context, id, hash, providerMessageI
 	}
 	return tx.Commit(ctx)
 }
+
+// ResolveDelivery records an administrator's manual verification of an
+// ambiguous provider result. Only an unknown delivery may be resolved; this
+// never calls the provider and never retries a send. A confirmed result must
+// carry the actual provider message ID; a rejection must carry a reason.
+func (s *Store) ResolveDelivery(ctx context.Context, scope domain.Scope, id, resolution, providerMessageID, note string) (domain.Delivery, error) {
+	if !scopeValid(scope) || id == "" || resolution != "confirmed" && resolution != "rejected" || len(note) > 512 ||
+		len(providerMessageID) > 128 || strings.TrimSpace(providerMessageID) != providerMessageID ||
+		strings.ContainsAny(providerMessageID, " \t\r\n") {
+		return domain.Delivery{}, domain.ErrInvalid
+	}
+	if resolution == "confirmed" && providerMessageID == "" || resolution == "rejected" && providerMessageID != "" {
+		return domain.Delivery{}, domain.ErrInvalid
+	}
+	if resolution == "rejected" && strings.TrimSpace(note) == "" {
+		return domain.Delivery{}, domain.ErrInvalid
+	}
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return domain.Delivery{}, err
+	}
+	defer tx.Rollback(ctx)
+	d, err := scanDelivery(tx.QueryRow(ctx, `SELECT `+deliveryColumns+` FROM bots.deliveries WHERE id=$1 AND tenant_id=$2 AND bot_id=$3 AND ($4='' OR scope_id=$4) FOR UPDATE`, id, scope.TenantID, scope.BotID, scope.ScopeID))
+	if err != nil {
+		return domain.Delivery{}, err
+	}
+	if d.State != "unknown" {
+		return domain.Delivery{}, domain.ErrConflict
+	}
+	taskState := "completed"
+	if resolution == "rejected" {
+		taskState = "canceled"
+	}
+	errorText := ""
+	if resolution == "rejected" {
+		errorText = note
+	}
+	if _, err := tx.Exec(ctx, `UPDATE bots.deliveries SET state=$2,provider_message_id=$3,error=$4,updated_at=now() WHERE id=$1`, d.ID, resolution, providerMessageID, errorText); err != nil {
+		return domain.Delivery{}, err
+	}
+	if d.TaskID != "" {
+		if _, err := tx.Exec(ctx, `UPDATE bots.tasks SET status=$4 WHERE id=$1 AND revision=$2 AND delivery_id=$3 AND status IN ('dispatching','unknown')`, d.TaskID, d.TaskRevision, d.ID, taskState); err != nil {
+			return domain.Delivery{}, err
+		}
+	}
+	if err := audit(ctx, tx, domain.Scope{TenantID: d.TenantID, BotID: d.BotID, ScopeID: d.ScopeID}, "delivery_resolved", d.ID, d.TaskRevision, "admin", map[string]string{
+		"previous_state": d.State, "state": resolution, "provider_message_id": providerMessageID, "note": note,
+	}); err != nil {
+		return domain.Delivery{}, err
+	}
+	updated, err := scanDelivery(tx.QueryRow(ctx, `SELECT `+deliveryColumns+` FROM bots.deliveries WHERE id=$1`, d.ID))
+	if err != nil {
+		return domain.Delivery{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Delivery{}, err
+	}
+	return updated, nil
+}
+
 func (s *Store) FailDelivery(ctx context.Context, id, hash, state, reason string, retryAt time.Time) error {
 	if state != "unknown" && state != "retryable" && state != "rejected" {
 		return domain.ErrInvalid

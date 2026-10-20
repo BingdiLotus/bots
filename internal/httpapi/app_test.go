@@ -32,6 +32,7 @@ type appStore struct {
 	limits           []int
 	queries          []string
 	mutations        []string
+	resolved         []string
 	mutationID       string
 	expectedRevision int
 	getBotCalls      int
@@ -115,6 +116,10 @@ func (s *appStore) ListDeliveries(_ context.Context, scope domain.Scope, n int) 
 func (s *appStore) ListAudit(_ context.Context, scope domain.Scope, n int) ([]domain.AuditEvent, error) {
 	s.recordQuery("audit", scope, n)
 	return nil, s.err
+}
+func (s *appStore) ResolveDelivery(_ context.Context, scope domain.Scope, id, resolution, providerMessageID, note string) (domain.Delivery, error) {
+	s.resolved = append(s.resolved, id+"|"+resolution+"|"+providerMessageID+"|"+note)
+	return domain.Delivery{ID: id, TenantID: scope.TenantID, BotID: scope.BotID, ScopeID: scope.ScopeID, State: resolution, ProviderMessageID: providerMessageID}, s.err
 }
 
 func newTestApp(t *testing.T) (*App, *appStore, *http.ServeMux) {
