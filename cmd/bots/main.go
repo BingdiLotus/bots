@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -22,6 +23,14 @@ import (
 	"github.com/bingdilotus/bots/internal/slack"
 	"github.com/bingdilotus/bots/internal/store"
 )
+
+func parsePeerRoundBudget(raw string) int {
+	n, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
 
 func parseBotIDAllowlist(raw string) map[string]bool {
 	out := map[string]bool{}
@@ -148,10 +157,14 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}()
 	mux := httpapi.New()
 	allowedBotIDs := parseBotIDAllowlist(os.Getenv("BOTS_TEST_ALLOWED_BOT_IDS"))
+	peerBudget := parsePeerRoundBudget(os.Getenv("BOTS_TEST_MAX_PEER_ROUNDS"))
 	if len(allowedBotIDs) > 0 {
 		slog.Warn("test-only peer bot allowlist enabled", "count", len(allowedBotIDs))
 	}
-	app := &httpapi.App{Store: db, TenantID: bot.TenantID, AdminTokenEnv: cfg.AdminTokenEnv, InternalTokenEnv: cfg.InternalTokenEnv, UpdateConfig: engine.UpdateConfig, TestAllowedBotIDs: allowedBotIDs}
+	if peerBudget > 0 {
+		slog.Warn("test-only peer round budget enabled", "max_per_bot_thread", peerBudget)
+	}
+	app := &httpapi.App{Store: db, TenantID: bot.TenantID, AdminTokenEnv: cfg.AdminTokenEnv, InternalTokenEnv: cfg.InternalTokenEnv, UpdateConfig: engine.UpdateConfig, TestAllowedBotIDs: allowedBotIDs, TestPeerBudget: peerBudget}
 	readinessMaxAge := max(3*cfg.PollInterval, 60*time.Second)
 	app.Ready = func(ctx context.Context) error {
 		if err := db.Ping(ctx); err != nil {

@@ -82,6 +82,9 @@ type Event struct {
 	SourceRevision string
 	Text           string
 	Target         ReplyTarget
+	// PeerBot is true only when this is an explicit app_mention admitted by the
+	// test-lab peer allowlist. It is never set for human messages or self loops.
+	PeerBot bool
 }
 
 type wireMessage struct {
@@ -180,6 +183,7 @@ func Normalize(binding Binding, envelope Envelope) (Event, bool, error) {
 	default:
 		return Event{}, false, nil
 	}
+	event.PeerBot = peerMentionAllowed(&message, binding)
 	if event.SourceRevision == "" {
 		event.SourceRevision = message.EventTS
 	}

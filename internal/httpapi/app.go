@@ -10,10 +10,12 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bingdilotus/bots/internal/config"
 	"github.com/bingdilotus/bots/internal/domain"
+	"github.com/bingdilotus/bots/internal/slack"
 )
 
 // Store is the HTTP layer's persistence boundary. Mutations and their receipts
@@ -48,6 +50,41 @@ type App struct {
 	// TestAllowedBotIDs is populated only by the test lab env. Empty keeps the
 	// production behavior of dropping every bot-authored Slack message.
 	TestAllowedBotIDs map[string]bool
+	// TestPeerBudget caps accepted peer-bot mentions per bot/thread when >0.
+	// It is intentionally process-local and survives only for the lab run.
+	TestPeerBudget int
+
+	testPeerMu     sync.Mutex
+	testPeerRounds map[string]int
+}
+
+func peerRoundKey(event slack.Event) string {
+	thread := event.ThreadTS
+	if thread == "" {
+		thread = event.MessageTS
+	}
+	return event.TenantID + "\x00" + event.BotID + "\x00" + event.ChannelID + "\x00" + thread
+}
+
+func (a *App) peerBudgetAllows(event slack.Event) bool {
+	if a.TestPeerBudget <= 0 || !event.PeerBot {
+		return true
+	}
+	a.testPeerMu.Lock()
+	defer a.testPeerMu.Unlock()
+	return a.testPeerRounds[peerRoundKey(event)] < a.TestPeerBudget
+}
+
+func (a *App) recordPeerRound(event slack.Event) {
+	if a.TestPeerBudget <= 0 || !event.PeerBot {
+		return
+	}
+	a.testPeerMu.Lock()
+	defer a.testPeerMu.Unlock()
+	if a.testPeerRounds == nil {
+		a.testPeerRounds = make(map[string]int)
+	}
+	a.testPeerRounds[peerRoundKey(event)]++
 }
 
 func (a *App) Register(mux *http.ServeMux) {

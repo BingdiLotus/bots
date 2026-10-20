@@ -85,7 +85,7 @@ func TestPeerBotMentionRequiresExplicitTestAllowlist(t *testing.T) {
 	binding.AllowedBotIDs = map[string]bool{"B_PEER": true, "B_SELF": true}
 	peer := eventEnvelope(t, `{"type":"app_mention","user":"U_PEER","bot_id":"B_PEER","channel":"C123","text":"<@U_BOT> coordinate","ts":"1700000002.000100","event_ts":"1700000002.000200"}`)
 	event, ok, err := Normalize(binding, peer)
-	if err != nil || !ok || event.Kind != EventMention || event.UserID != "U_PEER" {
+	if err != nil || !ok || event.Kind != EventMention || event.UserID != "U_PEER" || !event.PeerBot {
 		t.Fatalf("allowed peer mention: %+v %v %v", event, ok, err)
 	}
 	foreignPeer := eventEnvelope(t, `{"type":"app_mention","user":"U_OTHER","bot_id":"B_OTHER","channel":"C123","text":"<@U_BOT> nope","ts":"1700000003.000100"}`)

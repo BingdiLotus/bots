@@ -398,3 +398,29 @@ func TestSlackSocketTestPeerMentionAllowlistIsExplicitOnly(t *testing.T) {
 		t.Fatalf("peer thread/self message was admitted: inboxes=%d", len(s.inboxes))
 	}
 }
+
+func TestSlackSocketPeerRoundBudgetCapsPerThread(t *testing.T) {
+	a, s, _ := newTestApp(t)
+	s.bot.Config.EventTransport = domain.SlackSocket
+	a.TestAllowedBotIDs = map[string]bool{"BPEER": true}
+	a.TestPeerBudget = 1
+	peer := func(ts string) string {
+		return slackBody(`{"type":"app_mention","user":"U_PEER","bot_id":"BPEER","channel":"C1","text":"<@U_BOT> peer","ts":"` + ts + `","thread_ts":"1800000010.000001"}`)
+	}
+	if err := a.AcceptSlackSocketEvent(context.Background(), "bot", json.RawMessage(peer("1800000011.000001"))); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.AcceptSlackSocketEvent(context.Background(), "bot", json.RawMessage(peer("1800000012.000001"))); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.inboxes) != 1 {
+		t.Fatalf("peer budget admitted %d inboxes, want 1", len(s.inboxes))
+	}
+	human := slackBody(`{"type":"app_mention","user":"HUMAN","channel":"C1","text":"<@U_BOT> human","ts":"1800000013.000001"}`)
+	if err := a.AcceptSlackSocketEvent(context.Background(), "bot", json.RawMessage(human)); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.inboxes) != 2 {
+		t.Fatalf("human mention was blocked by peer budget: %d", len(s.inboxes))
+	}
+}

@@ -108,6 +108,9 @@ func (a *App) admitSlackEnvelope(ctx context.Context, bot domain.Bot, envelope s
 	if !ok {
 		return map[string]any{"ok": true, "ignored": true}, nil
 	}
+	if !a.peerBudgetAllows(event) {
+		return map[string]any{"ok": true, "ignored": true, "reason": "peer_budget"}, nil
+	}
 	if event.Kind == slack.EventSourceChanged || event.Kind == slack.EventSourceDeleted {
 		kind := "edited"
 		if event.Kind == slack.EventSourceDeleted {
@@ -134,6 +137,9 @@ func (a *App) admitSlackEnvelope(ctx context.Context, bot domain.Bot, envelope s
 	sourceID := domain.StableID("slack_message_", bot.Config.InstallationID, event.ChannelID, event.MessageTS)
 	input := domain.Inbox{TenantID: bot.TenantID, BotID: bot.ID, ScopeID: domain.KnowledgeScope(bot.TenantID, bot.ID, bot.Config.InstallationID, event.ChannelID), Namespace: "slack", SourceID: sourceID, Input: event.Text, Target: target}
 	stored, created, err := a.Store.AcceptInbox(ctx, input)
+	if created {
+		a.recordPeerRound(event)
+	}
 	if errors.Is(err, domain.ErrDisabled) {
 		return map[string]any{"ok": true, "ignored": true, "reason": "disabled"}, nil
 	}
