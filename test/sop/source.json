@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "source": "real G1 private Slack test channel; recall reply after Socket Mode restart",
+  "tenant_id": "bots-slack-g1",
+  "bot_id": "bingdi",
+  "thread_ts": "1792457447.132529",
+  "message_ts": "1792457447.132529",
+  "input": "请检索已保存知识：真实 Slack 重启验收的日期和代码版本，并注明来源。",
+  "run_id": "r_1f30323eb2b3a70c310c178a761033b3",
+  "session_id": "s_5507d92f3e7e8881e5e1c7791047ff6b",
+  "final": "已保存知识显示：\n\n- **真实 Slack 重启验收日期**：2026-10-20  \n- **代码版本**：`b4e8ee3`  \n- **来源**：保存知识 `knowledge_f4a4dea7071ab57d5edd96ab4a684916`，原始来源 Slack 消息 `slack_message_e9cfd288ffaa38ebfac1ee0a2be7037d`。  \n\n另有一条交叉记录也确认代码为 `b4e8ee3`，来源 Slack 消息 `slack_message_f2a90bbac6d52000fe7ec3c3ca49b65e`。",
+  "final_delivery_ts": "1792457719.778009",
+  "knowledge": [
+    {
+      "id": "knowledge_5f864d4d2759296d6b5e0a8e69b0011e",
+      "content": "Bingdi MVP 真实 Slack 验收，代码 b4e8ee3。",
+      "source_id": "slack_message_f2a90bbac6d52000fe7ec3c3ca49b65e"
+    },
+    {
+      "id": "knowledge_f4a4dea7071ab57d5edd96ab4a684916",
+      "content": "真实 Slack 重启验收，日期 2026-10-20，代码 b4e8ee3。",
+      "source_id": "slack_message_e9cfd288ffaa38ebfac1ee0a2be7037d"
+    }
+  ],
+  "observed_problem": "最终回复在请求的日期/代码之外，主动展开了另一条交叉记录（Bingdi MVP 真实 Slack 验收），而成员只要求检索已保存知识并注明来源。",
+  "correction": "回答查询时先给直接答案，只引用最相关的一条来源；除非成员要求更多或检索结果互相冲突，不主动展开其它记录。",
+  "confirmed_by": "user",
+  "confirmed_at": "2026-10-20T09:14:00+08:00",
+  "candidate_context": {
+    "included": [
+      "input",
+      "final",
+      "baseline_instructions",
+      "correction"
+    ],
+    "excluded": [
+      "suite.json",
+      "checker.py",
+      "case set",
+      "checker logic"
+    ]
+  }
+}

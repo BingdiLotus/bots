@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "frozen": true,
+  "model": "claude-sonnet-4-6",
+  "timezone": "Asia/Shanghai",
+  "initial_knowledge": [
+    {
+      "id": "knowledge_10000000000000000000000000000001",
+      "content": "Bingdi MVP 真实 Slack 验收，代码 b4e8ee3。",
+      "kind": "knowledge",
+      "source_id": "sop_fixture_mvp_review",
+      "origin_command_id": "sop_fixture_seed"
+    },
+    {
+      "id": "knowledge_10000000000000000000000000000002",
+      "content": "真实 Slack 重启验收，日期 2026-10-20，代码 b4e8ee3。",
+      "kind": "knowledge",
+      "source_id": "sop_fixture_restart_review",
+      "origin_command_id": "sop_fixture_seed"
+    },
+    {
+      "id": "knowledge_10000000000000000000000000000003",
+      "content": "Orion 评审时间是 2026-10-21 15:00（Asia/Shanghai）。",
+      "kind": "knowledge",
+      "source_id": "sop_fixture_orion_review",
+      "origin_command_id": "sop_fixture_seed"
+    }
+  ],
+  "cases": [
+    {
+      "id": "trace_recall",
+      "input": "请检索已保存知识：真实 Slack 重启验收的日期和代码版本，并注明来源。",
+      "message_ts": "1792500000.000001",
+      "expect": {
+        "tools": ["recall"],
+        "forbid_tools": ["create_reminder", "update_reminder", "cancel_reminder"],
+        "final_contains": ["2026-10-20", "b4e8ee3"],
+        "final_not_contains": ["Bingdi MVP"],
+        "knowledge_delta": 0,
+        "task_delta": 0
+      }
+    },
+    {
+      "id": "single_recall",
+      "input": "Orion 评审时间是什么？请给出日期、时间和来源。",
+      "message_ts": "1792500001.000001",
+      "expect": {
+        "tools": ["recall"],
+        "forbid_tools": ["create_reminder", "update_reminder", "cancel_reminder"],
+        "final_contains": ["2026-10-21", "15:00"],
+        "final_not_contains": ["Bingdi", "Li Wei"],
+        "knowledge_delta": 0,
+        "task_delta": 0
+      }
+    },
+    {
+      "id": "missing_recall",
+      "input": "Zephyr 项目的发布日期是什么？",
+      "message_ts": "1792500002.000001",
+      "expect": {
+        "tools": ["recall"],
+        "forbid_tools": ["create_reminder", "update_reminder", "cancel_reminder"],
+        "final_contains_any": [["没有", "未找到", "无法", "不存在", "无相关", "未保存"]],
+        "final_not_regex": ["20\\d\\d-\\d\\d-\\d\\d"],
+        "knowledge_delta": 0,
+        "task_delta": 0
+      }
+    },
+    {
+      "id": "reminder_relative",
+      "input": "记住：Orion 评审改到 2026-10-22 16:00。并在 3 分钟后提醒我准备评审材料。",
+      "message_ts": "1792500003.000001",
+      "expect": {
+        "tools": ["remember", "create_reminder"],
+        "forbid_tools": ["update_reminder", "cancel_reminder"],
+        "final_contains": ["2026-10-22", "评审材料"],
+        "final_contains_any": [["尚未送达", "未送达", "不表示已送达", "不代表已送达"]],
+        "final_not_contains": ["已送达", "已发送"],
+        "knowledge_delta": 1,
+        "task_delta": 1,
+        "task_due_offset_seconds": 180,
+        "task_due_tolerance_seconds": 15,
+        "task_text_contains": "评审材料"
+      }
+    },
+    {
+      "id": "ambiguous_time",
+      "input": "提醒我明天开会。",
+      "message_ts": "1792500004.000001",
+      "expect": {
+        "forbid_tools": ["create_reminder", "update_reminder", "cancel_reminder"],
+        "final_contains_any": [["时间", "几点", "什么时候", "日期", "确认"]],
+        "knowledge_delta": 0,
+        "task_delta": 0
+      }
+    }
+  ]
+}
