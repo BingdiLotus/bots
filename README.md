@@ -2,7 +2,7 @@
 
 面向企业、组织和团队的 Bot 原生能力与治理平台。管理员管理人格、SOP、应用账号和运行范围；Bot 可以沉淀业务知识/经验，自建任务与提醒。成员通过 Slack 等外部应用交互，Bots 管理台负责配置、启停和审计。
 
-当前实现了知识与提醒的 MVP 主链：认证入站（签名 webhook 或内部 App 的 Socket Mode）、持久 inbox、五个原生工具、Chronotope 有限 run/耐久 timer、唯一 sender、回执/unknown 台账及管理员 API。G0 已使用真实 Bots 进程、PG 与 Chronotope 栈验证；G1 已在私有测试频道通过真实 Slack Socket Mode、真实模型、知识/提醒、等待中崩溃重启与跨会话 recall；G2 已用真实纠正轨迹、冻结 fixture、隔离配对和人工批准完成一次 SOP 改进并发布真实 Bot revision 2。仓库：[BingdiLotus/bots](https://github.com/BingdiLotus/bots)。阶段状态与证据见[开发进展](docs/MVP开发进展.md)。
+当前实现了知识与提醒的 MVP 主链：认证入站（签名 webhook 或内部 App 的 Socket Mode）、持久 inbox、五个原生工具、Chronotope 有限 run/耐久 timer、唯一 sender、回执/unknown 台账及管理员 API。G0 已使用真实 Bots 进程、PG 与 Chronotope 栈验证；G1 已在私有测试频道通过真实 Slack Socket Mode、真实模型、知识/提醒、等待中崩溃重启与跨会话 recall；G2 已用真实纠正轨迹、冻结 fixture、隔离配对和人工批准完成一次 SOP 改进并发布真实 Bot revision 2。仓库：[BingdiLotus/bots](https://github.com/BingdiLotus/bots)。阶段状态与证据见[开发进展](docs/MVP开发进展.md)；受控试用上线准备见[部署与试用](docs/部署与试用.md)，Slack scope、目标主机部署、全栈备份和 unknown 处置仍有未完成项。
 
 管理员可通过 `/admin` 管理工作配置、启停、知识、任务、回执和审计。页面直接嵌入 Go 服务；成员仍在 Slack 中与 Bot 交互。管理页与一次 SOP 改进的完整验收分别记录，尚未用界面可用替代实际改进结果。
 
@@ -16,13 +16,15 @@ cp configs/bot.example.yaml configs/bot.yaml
 GOTOOLCHAIN=go1.26.0 make run
 ```
 
-另一个终端检查进程：
+另一个终端检查进程与依赖就绪：
 
 ```sh
-curl -fsS http://127.0.0.1:8090/healthz
+curl -fsS http://127.0.0.1:8090/healthz   # 仅进程存活
+curl -fsS http://127.0.0.1:8090/readyz    # PG、dispatcher 租约/Step、Socket 连接
+./bin/bots readyz                         # scratch 容器/服务管理器可用的二进制探针
 ```
 
-响应为 `{"status":"alive"}`。探针仅表示进程存活，不表示 Slack 安装或某项业务已经验收。
+`healthz` 只表示进程存活；`readyz` 失败时返回 503，且不输出依赖错误细节。受控试用的 systemd/容器模板、最小 Slack scopes、备份恢复演练和 unknown 处置见[部署与试用](docs/部署与试用.md)。
 
 ```sh
 make check
@@ -30,7 +32,7 @@ make build
 ./bin/bots
 ```
 
-`make check` 执行格式检查、vet、测试和构建。运行时收到 SIGINT/SIGTERM 后，在配置期限内优雅退出。
+`make check` 执行格式检查、vet、测试、构建、Shell 脚本语法和 G2 Python 编译检查。运行时收到 SIGINT/SIGTERM 后，在配置期限内优雅退出。
 
 ## 配置
 
