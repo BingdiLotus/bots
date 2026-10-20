@@ -59,6 +59,66 @@ func TestNormalizeBotRejectsCredentialsAndLimits(t *testing.T) {
 	}
 }
 
+func TestNormalizeBotSlackTransportModes(t *testing.T) {
+	for _, entry := range []struct {
+		name      string
+		mutate    func(*domain.BotConfig)
+		transport string
+		valid     bool
+	}{
+		{name: "legacy defaults to webhook", transport: domain.SlackWebhook, valid: true},
+		{name: "explicit webhook", mutate: func(c *domain.BotConfig) { c.EventTransport = domain.SlackWebhook }, transport: domain.SlackWebhook, valid: true},
+		{name: "default webhook requires signing secret", mutate: func(c *domain.BotConfig) { c.SigningSecretEnv = "" }},
+		{name: "explicit webhook requires signing secret", mutate: func(c *domain.BotConfig) {
+			c.EventTransport = domain.SlackWebhook
+			c.SigningSecretEnv = ""
+		}},
+		{name: "socket needs no signing secret", mutate: func(c *domain.BotConfig) {
+			c.EventTransport = domain.SlackSocket
+			c.AppTokenEnv = "TEST_SLACK_APP_TOKEN"
+			c.SigningSecretEnv = ""
+		}, transport: domain.SlackSocket, valid: true},
+		{name: "socket requires app token reference", mutate: func(c *domain.BotConfig) { c.EventTransport = domain.SlackSocket }},
+		{name: "socket requires workspace", mutate: func(c *domain.BotConfig) {
+			c.EventTransport = domain.SlackSocket
+			c.AppTokenEnv = "TEST_SLACK_APP_TOKEN"
+			c.WorkspaceID = ""
+		}},
+		{name: "webhook requires workspace", mutate: func(c *domain.BotConfig) { c.WorkspaceID = "" }},
+		{name: "unsupported transport", mutate: func(c *domain.BotConfig) { c.EventTransport = "poll" }},
+		{name: "socket app token must be env reference", mutate: func(c *domain.BotConfig) {
+			c.EventTransport = domain.SlackSocket
+			c.AppTokenEnv = "xapp-plaintext-secret"
+		}},
+		{name: "webhook rejects invalid optional app token reference", mutate: func(c *domain.BotConfig) { c.AppTokenEnv = "inline app token" }},
+		{name: "socket rejects invalid optional signing reference", mutate: func(c *domain.BotConfig) {
+			c.EventTransport = domain.SlackSocket
+			c.AppTokenEnv = "TEST_SLACK_APP_TOKEN"
+			c.SigningSecretEnv = "inline signing secret"
+		}},
+		{name: "socket bot token must be env reference", mutate: func(c *domain.BotConfig) {
+			c.EventTransport = domain.SlackSocket
+			c.AppTokenEnv = "TEST_SLACK_APP_TOKEN"
+			c.TokenEnv = "xoxb-plaintext-secret"
+		}},
+	} {
+		t.Run(entry.name, func(t *testing.T) {
+			cfg := validConfig()
+			if entry.mutate != nil {
+				entry.mutate(&cfg)
+			}
+			got, err := NormalizeBot(cfg)
+			if entry.valid {
+				if err != nil || got.SlackTransport() != entry.transport || got.AppTokenEnv != cfg.AppTokenEnv || got.SigningSecretEnv != cfg.SigningSecretEnv {
+					t.Fatalf("configuration changed transport or credential references: %+v error=%v", got, err)
+				}
+			} else if err == nil {
+				t.Fatal("invalid Slack transport configuration was accepted")
+			}
+		})
+	}
+}
+
 func TestSecretErrorDoesNotRevealValue(t *testing.T) {
 	t.Setenv("TEST_SECRET_EMPTY", "")
 	if _, err := Secret("TEST_SECRET_EMPTY"); err == nil {

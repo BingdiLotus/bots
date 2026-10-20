@@ -75,11 +75,23 @@ func NormalizeBot(cfg domain.BotConfig) (domain.BotConfig, error) {
 	if _, err := time.LoadLocation(cfg.Timezone); err != nil {
 		return cfg, fmt.Errorf("invalid organization timezone")
 	}
-	if !environmentName.MatchString(cfg.TokenEnv) || cfg.SigningSecretEnv != "" && !environmentName.MatchString(cfg.SigningSecretEnv) {
+	if !environmentName.MatchString(cfg.TokenEnv) || cfg.SigningSecretEnv != "" && !environmentName.MatchString(cfg.SigningSecretEnv) || cfg.AppTokenEnv != "" && !environmentName.MatchString(cfg.AppTokenEnv) {
 		return cfg, fmt.Errorf("credentials must be environment variable references")
 	}
-	if cfg.ChannelKind == "slack" && (cfg.WorkspaceID == "" || cfg.SigningSecretEnv == "") {
-		return cfg, fmt.Errorf("Slack installation requires workspace_id and signing_secret_env")
+	if cfg.WorkspaceID == "" {
+		return cfg, fmt.Errorf("Slack installation requires workspace_id")
+	}
+	switch cfg.SlackTransport() {
+	case domain.SlackWebhook:
+		if cfg.SigningSecretEnv == "" {
+			return cfg, fmt.Errorf("Slack webhook requires signing_secret_env")
+		}
+	case domain.SlackSocket:
+		if cfg.AppTokenEnv == "" {
+			return cfg, fmt.Errorf("Slack socket transport requires app_token_env")
+		}
+	default:
+		return cfg, fmt.Errorf("Slack event_transport must be webhook or socket")
 	}
 	if cfg.MaxSteps == 0 {
 		cfg.MaxSteps = 16

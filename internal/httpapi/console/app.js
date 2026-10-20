@@ -159,6 +159,7 @@
     details.replaceChildren();
     for (const [label, value] of [["渠道", cfg.channel_kind], ["安装账号", cfg.installation_id], ["工作区", cfg.workspace_id],
       ["频道", cfg.channel_id], ["Bot 用户", cfg.bot_user_id], ["token 引用", cfg.token_env], ["签名引用", cfg.signing_secret_env],
+      ["事件接收", cfg.event_transport || "webhook"], ["App token 引用", cfg.app_token_env],
       ["工具桥接", cfg.bridge_ref], ["回调绑定", cfg.timer_target_ref], ["运行时 Agent", bot.runtime_agent_id || "待绑定"]]) {
       details.append(node("dt", label), node("dd", value));
     }

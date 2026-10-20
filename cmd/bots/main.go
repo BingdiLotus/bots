@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/bingdilotus/bots/internal/chronotope"
 	"github.com/bingdilotus/bots/internal/config"
+	"github.com/bingdilotus/bots/internal/domain"
 	"github.com/bingdilotus/bots/internal/httpapi"
 	"github.com/bingdilotus/bots/internal/service"
 	"github.com/bingdilotus/bots/internal/slack"
@@ -61,7 +63,13 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("import Bot: %w", err)
 	}
-	for _, ref := range []string{cfg.RuntimeTokenEnv, cfg.AdminTokenEnv, cfg.InternalTokenEnv, bot.Config.TokenEnv, bot.Config.SigningSecretEnv} {
+	refs := []string{cfg.RuntimeTokenEnv, cfg.AdminTokenEnv, cfg.InternalTokenEnv, bot.Config.TokenEnv}
+	if bot.Config.SlackTransport() == domain.SlackSocket {
+		refs = append(refs, bot.Config.AppTokenEnv)
+	} else {
+		refs = append(refs, bot.Config.SigningSecretEnv)
+	}
+	for _, ref := range refs {
 		if _, err := config.Secret(ref); err != nil {
 			return err
 		}
@@ -70,6 +78,17 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		ResolveToken: func(_ context.Context, ref string) (string, error) { return config.Secret(ref) }})
 	if err != nil {
 		return err
+	}
+	var socket *slack.SocketClient
+	if bot.Config.SlackTransport() == domain.SlackSocket {
+		token, err := config.Secret(bot.Config.AppTokenEnv)
+		if err != nil {
+			return err
+		}
+		socket, err = slack.NewSocketClient(token)
+		if err != nil {
+			return err
+		}
 	}
 	channel, err := slack.NewClient(cfg.SlackAPIURL, nil)
 	if err != nil {
@@ -104,6 +123,27 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	workerCtx, stopWorker := context.WithCancel(ctx)
 	defer stopWorker()
 	workerErr := make(chan error, 1)
+	var socketErr chan error
+	if socket != nil {
+		socketErr = make(chan error, 1)
+		go func() {
+			socketErr <- socket.Run(workerCtx, func(eventCtx context.Context, body json.RawMessage) error {
+				err := app.AcceptSlackSocketEvent(eventCtx, bot.ID, body)
+				if err != nil && workerCtx.Err() == nil {
+					logger.Warn("Slack event admission unconfirmed", "bot_id", bot.ID)
+				}
+				return err
+			})
+		}()
+		go func() {
+			select {
+			case <-socket.FirstConnected():
+				logger.Info("Slack Socket Mode connected", "workspace_id", bot.Config.WorkspaceID, "bot_id", bot.ID)
+			case <-workerCtx.Done():
+			}
+		}()
+		logger.Info("Slack Socket Mode receiver started", "workspace_id", bot.Config.WorkspaceID, "bot_id", bot.ID)
+	}
 	go func() { workerErr <- engine.Run(workerCtx) }()
 	go func() {
 		serveErr <- server.Serve(listener)
@@ -111,12 +151,20 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	logger.Info("http server listening", "addr", listener.Addr().String())
 
 	var failure error
-	serverDone, workerDone := false, false
+	serverDone, workerDone, socketDone := false, false, socketErr == nil
 	select {
 	case err := <-serveErr:
 		serverDone, failure = true, fmt.Errorf("serve: %w", err)
 	case err := <-workerErr:
-		workerDone, failure = true, fmt.Errorf("dispatcher: %w", err)
+		workerDone = true
+		if ctx.Err() == nil && err != nil {
+			failure = fmt.Errorf("dispatcher: %w", err)
+		}
+	case err := <-socketErr:
+		socketDone = true
+		if ctx.Err() == nil && err != nil {
+			failure = fmt.Errorf("Slack receiver: %w", err)
+		}
 	case <-ctx.Done():
 	}
 	stopWorker()
@@ -141,6 +189,16 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			}
 		case <-shutdownCtx.Done():
 			return fmt.Errorf("dispatcher shutdown timed out")
+		}
+	}
+	if !socketDone {
+		select {
+		case err := <-socketErr:
+			if err != nil && !errors.Is(err, context.Canceled) {
+				failure = fmt.Errorf("Slack receiver: %w", err)
+			}
+		case <-shutdownCtx.Done():
+			return fmt.Errorf("Slack receiver shutdown timed out")
 		}
 	}
 	logger.Info("http server stopped")

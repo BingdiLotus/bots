@@ -4,10 +4,12 @@ go 1.26.0
 
 require (
 	github.com/jackc/pgx/v5 v5.7.1
+	github.com/slack-go/slack v0.30.1
 	go.yaml.in/yaml/v3 v3.0.5
 )
 
 require (
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect

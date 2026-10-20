@@ -44,6 +44,8 @@ type BotConfig struct {
 	ChannelID        string `json:"channel_id,omitempty"`
 	TokenEnv         string `json:"token_env"`
 	SigningSecretEnv string `json:"signing_secret_env,omitempty"`
+	EventTransport   string `json:"event_transport,omitempty"`
+	AppTokenEnv      string `json:"app_token_env,omitempty"`
 	BridgeRef        string `json:"bridge_ref"`
 	TimerTargetRef   string `json:"timer_target_ref"`
 	MaxOutputTokens  int    `json:"max_output_tokens"`
@@ -52,10 +54,33 @@ type BotConfig struct {
 	MaxPendingTasks  int    `json:"max_pending_tasks"`
 }
 
+const (
+	SlackWebhook = "webhook"
+	SlackSocket  = "socket"
+)
+
+// SlackTransport defaults to the signed webhook ingress when unspecified.
+func (c BotConfig) SlackTransport() string {
+	if c.EventTransport == "" {
+		return SlackWebhook
+	}
+	return c.EventTransport
+}
+
 // SameDeployment fixes the account and endpoint bindings for a Bot's lifetime.
 // Credential values can rotate at the original environment reference.
 func (c BotConfig) SameDeployment(other BotConfig) bool {
-	return c.ChannelKind == other.ChannelKind && c.InstallationID == other.InstallationID && c.WorkspaceID == other.WorkspaceID && c.BotUserID == other.BotUserID && c.ChannelID == other.ChannelID && c.TokenEnv == other.TokenEnv && c.SigningSecretEnv == other.SigningSecretEnv && c.BridgeRef == other.BridgeRef && c.TimerTargetRef == other.TimerTargetRef
+	return c.ChannelKind == other.ChannelKind &&
+		c.InstallationID == other.InstallationID &&
+		c.WorkspaceID == other.WorkspaceID &&
+		c.BotUserID == other.BotUserID &&
+		c.ChannelID == other.ChannelID &&
+		c.TokenEnv == other.TokenEnv &&
+		c.SigningSecretEnv == other.SigningSecretEnv &&
+		c.SlackTransport() == other.SlackTransport() &&
+		c.AppTokenEnv == other.AppTokenEnv &&
+		c.BridgeRef == other.BridgeRef &&
+		c.TimerTargetRef == other.TimerTargetRef
 }
 
 type Bot struct {

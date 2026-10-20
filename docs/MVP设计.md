@@ -109,7 +109,7 @@ flowchart LR
 
 ### 4.2 Slack 接纳、排队和终态读取
 
-1. 校验签名/时间、installation→tenant/bot 绑定与事件类型；先提交 inbox，再按 Slack 期限 ACK。Slack 的 `event_id` 是投递 ID，逻辑来源按 `installation/channel/message_ts` 生成 canonical message ID；`message` 与 `app_mention` 订阅交叉投递同一消息时共用该 ID，不产生第二个命令。编辑/删除仍按原始 message timestamp 关联来源并失效。
+1. webhook 校验签名/时间；已启用 Socket Mode 的内部 App 使用受鉴权 WebSocket。两种接收方式复用同一 installation→tenant/bot 绑定、事件归一化及持久 inbox，再按 Slack 期限 ACK。每个账号只选择一种传输；Socket 配置不开放 webhook 入口，不能绕过鉴权。Slack 的 `event_id` 是投递 ID，逻辑来源按 `installation/channel/message_ts` 生成 canonical message ID；`message` 与 `app_mention` 订阅交叉投递同一消息时共用该 ID，不产生第二个命令。编辑/删除仍按原始 message timestamp 关联来源并失效。
 2. 同 thread 串行消费；忙时输入留在 PG 队列，不因 `session active` 丢弃或标永久失败。简单 poller 足够，不先实现完整 actor/mailbox/signals。
 3. 用稳定 command ID 调 Chronotope；run/command/outbox 同事务接纳，直接 `202`。幂等查询先于 active-run 冲突判断，同 ID 异请求拒绝。
 4. Bots 持久保存 run handle，轮询受权的 `GET /runs/{id}` 读取 canonical status/final/error/usage；终态与 final/error 同一提交后可见，不出现 completed 但结果尚未保存的窗口。SSE 不是正确性的唯一来源。

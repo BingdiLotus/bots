@@ -164,7 +164,22 @@ func defaults(c domain.BotConfig) domain.BotConfig {
 	}
 	return c
 }
+func validateSlackTransport(c domain.BotConfig) error {
+	switch c.SlackTransport() {
+	case domain.SlackWebhook:
+		return nil
+	case domain.SlackSocket:
+		if c.AppTokenEnv != "" {
+			return nil
+		}
+	}
+	return domain.ErrInvalid
+}
+
 func validateConfig(c domain.BotConfig) error {
+	if c.ChannelKind == "slack" && validateSlackTransport(c) != nil {
+		return domain.ErrInvalid
+	}
 	if c.Timezone != "" {
 		if _, err := time.LoadLocation(c.Timezone); err != nil {
 			return domain.ErrInvalid

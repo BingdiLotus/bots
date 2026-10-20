@@ -1,10 +1,12 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -167,5 +169,208 @@ func TestSlackRequiresOneBoundedSignedEnvelope(t *testing.T) {
 	w := signedSlackRequest(mux, string(oversized), "slack-signing", a.Now())
 	if w.Code != 413 || len(s.inboxes) != 0 {
 		t.Fatal("oversized Slack payload was processed")
+	}
+}
+
+func TestSlackSocketAndWebhookShareAdmissionSemantics(t *testing.T) {
+	var stores []*appStore
+	for _, transport := range []string{domain.SlackWebhook, domain.SlackSocket} {
+		t.Run(transport, func(t *testing.T) {
+			a, s, mux := newTestApp(t)
+			s.bot.Config.EventTransport = transport
+			if transport == domain.SlackSocket {
+				s.bot.Config.SigningSecretEnv = ""
+				s.bot.Config.AppTokenEnv = "HTTP_TEST_SLACK_APP_TOKEN"
+			}
+			accept := func(eventID, event string) {
+				t.Helper()
+				body := strings.Replace(slackBody(event), `"event_id":"Ev1"`, `"event_id":"`+eventID+`"`, 1)
+				if transport == domain.SlackSocket {
+					if err := a.AcceptSlackSocketEvent(context.Background(), "bot", json.RawMessage(body)); err != nil {
+						t.Fatal(err)
+					}
+				} else if w := signedSlackRequest(mux, body, "slack-signing", a.Now()); w.Code != 200 {
+					t.Fatalf("webhook event: %d %s", w.Code, w.Body.String())
+				}
+			}
+			accept("mention", `{"type":"app_mention","user":"HUMAN","channel":"C1","text":"<@U_BOT> remember this","ts":"1800000000.000001"}`)
+			reply := `{"type":"message","user":"HUMAN","channel":"C1","text":"follow up","ts":"1800000001.000001","thread_ts":"1800000000.000001"}`
+			accept("unsubscribed", reply)
+			if len(s.inboxes) != 1 {
+				t.Fatal("unsubscribed reply became model input")
+			}
+			s.subscribed = true
+			accept("reply", reply)
+			accept("duplicate-mention", strings.Replace(reply, `"type":"message"`, `"type":"app_mention"`, 1))
+			if len(s.inboxes) != 3 || s.inboxes[1].SourceID != s.inboxes[2].SourceID || s.inboxes[1].Target != s.inboxes[2].Target {
+				t.Fatalf("mention and message deliveries diverged before atomic deduplication: %+v", s.inboxes)
+			}
+			// Revocations still reach durable storage while the Bot is paused.
+			s.bot.Enabled = false
+			s.bot.AccountEnabled = false
+			accept("edit", `{"type":"message","subtype":"message_changed","hidden":true,"channel":"C1","message":{"user":"HUMAN","text":"edited","ts":"1800000000.000001"}}`)
+			accept("delete", `{"type":"message","subtype":"message_deleted","hidden":true,"channel":"C1","deleted_ts":"1800000000.000001"}`)
+			if len(s.inboxes) != 3 || len(s.invalidations) != 2 {
+				t.Fatalf("source revocation bypassed invalidation: inbox=%+v invalidations=%v", s.inboxes, s.invalidations)
+			}
+			stores = append(stores, s)
+		})
+	}
+	if len(stores) != 2 {
+		t.Fatal("both ingress paths must complete")
+	}
+	webhook, socket := stores[0], stores[1]
+	if !reflect.DeepEqual(socket.inboxes, webhook.inboxes) || !reflect.DeepEqual(socket.conversationKeys, webhook.conversationKeys) || !reflect.DeepEqual(socket.invalidations, webhook.invalidations) {
+		t.Fatalf("Socket ingress changed canonical sources, targets, subscriptions or revocations: webhook=%+v socket=%+v", webhook, socket)
+	}
+}
+
+type slackIngressStore struct {
+	Store
+	bot    *domain.Bot
+	failAt string
+	err    error
+}
+
+func (s slackIngressStore) GetBot(ctx context.Context, tenant, bot string) (domain.Bot, error) {
+	if s.failAt == "lookup" {
+		return domain.Bot{}, s.err
+	}
+	if s.bot != nil {
+		return *s.bot, nil
+	}
+	return s.Store.GetBot(ctx, tenant, bot)
+}
+
+func (s slackIngressStore) AcceptInbox(ctx context.Context, in domain.Inbox) (domain.Inbox, bool, error) {
+	if s.failAt == "inbox" {
+		return domain.Inbox{}, false, s.err
+	}
+	return s.Store.AcceptInbox(ctx, in)
+}
+
+func (s slackIngressStore) HasConversation(ctx context.Context, tenant, bot, key string) (bool, error) {
+	if s.failAt == "subscription" {
+		return false, s.err
+	}
+	return s.Store.HasConversation(ctx, tenant, bot, key)
+}
+
+func (s slackIngressStore) InvalidateMessage(ctx context.Context, tenant, bot, installation, channel, message, kind string) error {
+	if s.failAt == "invalidation" {
+		return s.err
+	}
+	return s.Store.InvalidateMessage(ctx, tenant, bot, installation, channel, message, kind)
+}
+
+func TestSlackSocketReturnsPersistenceErrorsBeforeAcknowledgment(t *testing.T) {
+	for _, entry := range []struct{ stage, event string }{
+		{"lookup", `{"type":"app_mention","user":"HUMAN","channel":"C1","text":"x","ts":"1800000000.000001"}`},
+		{"inbox", `{"type":"app_mention","user":"HUMAN","channel":"C1","text":"x","ts":"1800000000.000001"}`},
+		{"subscription", `{"type":"message","user":"HUMAN","channel":"C1","text":"reply","ts":"1800000001.000001","thread_ts":"1800000000.000001"}`},
+		{"invalidation", `{"type":"message","subtype":"message_deleted","hidden":true,"channel":"C1","deleted_ts":"1800000000.000001"}`},
+	} {
+		t.Run(entry.stage, func(t *testing.T) {
+			a, s, _ := newTestApp(t)
+			s.bot.Config.EventTransport = domain.SlackSocket
+			s.subscribed = true
+			failure := errors.New("durable storage unavailable")
+			a.Store = slackIngressStore{Store: s, failAt: entry.stage, err: failure}
+			body := json.RawMessage(slackBody(entry.event))
+			if err := a.AcceptSlackSocketEvent(context.Background(), "bot", body); !errors.Is(err, failure) {
+				t.Fatalf("failed durable admission must prevent transport ACK: %v", err)
+			}
+			if len(s.inboxes) != 0 || len(s.invalidations) != 0 {
+				t.Fatal("failed operation changed durable input or source state")
+			}
+			a.Store = s
+			if err := a.AcceptSlackSocketEvent(context.Background(), "bot", body); err != nil {
+				t.Fatalf("redelivery after storage recovery failed: %v", err)
+			}
+			if len(s.inboxes)+len(s.invalidations) != 1 {
+				t.Fatal("recovered delivery did not reach durable storage")
+			}
+		})
+	}
+}
+
+func TestSlackSocketIgnoresForeignEventsAndBotLoops(t *testing.T) {
+	a, s, _ := newTestApp(t)
+	s.bot.Config.EventTransport = domain.SlackSocket
+	for _, body := range []string{
+		`{"type":"event_callback","team_id":"OTHER","event_id":"Ev1","event":{"type":"app_mention","user":"HUMAN","channel":"C1","text":"x","ts":"1800000000.000001"}}`,
+		slackBody(`{"type":"app_mention","user":"HUMAN","channel":"OTHER","text":"x","ts":"1800000000.000001"}`),
+		slackBody(`{"type":"app_mention","user":"U_BOT","channel":"C1","text":"x","ts":"1800000000.000001"}`),
+		slackBody(`{"type":"app_mention","user":"OTHER_BOT","bot_id":"B1","channel":"C1","text":"x","ts":"1800000000.000001"}`),
+		slackBody(`{"type":"message","user":"HUMAN","channel":"C1","text":"ambient","ts":"1800000000.000001"}`),
+	} {
+		if err := a.AcceptSlackSocketEvent(context.Background(), "bot", json.RawMessage(body)); err != nil {
+			t.Fatalf("deterministically ignored event should permit ACK: %v", err)
+		}
+	}
+	if len(s.inboxes) != 0 || len(s.invalidations) != 0 || len(s.conversationKeys) != 0 {
+		t.Fatal("unrelated Slack event reached a durable operation")
+	}
+}
+
+func TestSlackSocketRejectsInvalidEnvelopeAndIngressBinding(t *testing.T) {
+	valid := slackBody(`{"type":"app_mention","user":"HUMAN","channel":"C1","text":"x","ts":"1800000000.000001"}`)
+	for _, entry := range []struct {
+		name   string
+		body   string
+		mutate func(*App, *appStore)
+	}{
+		{name: "malformed", body: valid + ` {}`},
+		{name: "null", body: `null`},
+		{name: "array", body: `[]`},
+		{name: "incomplete", body: `{"type":"event_callback","team_id":"T1"}`},
+		{name: "oversized", body: strings.Repeat("x", 1<<20+1)},
+		{name: "webhook transport", mutate: func(_ *App, s *appStore) { s.bot.Config.EventTransport = domain.SlackWebhook }},
+		{name: "foreign channel kind", mutate: func(_ *App, s *appStore) { s.bot.Config.ChannelKind = "other" }},
+		{name: "foreign tenant", mutate: func(a *App, s *appStore) {
+			bot := s.bot
+			bot.TenantID = "other"
+			a.Store = slackIngressStore{Store: s, bot: &bot}
+		}},
+		{name: "foreign bot", mutate: func(a *App, s *appStore) {
+			bot := s.bot
+			bot.ID = "other"
+			a.Store = slackIngressStore{Store: s, bot: &bot}
+		}},
+	} {
+		t.Run(entry.name, func(t *testing.T) {
+			a, s, _ := newTestApp(t)
+			s.bot.Config.EventTransport = domain.SlackSocket
+			if entry.mutate != nil {
+				entry.mutate(a, s)
+			}
+			body := entry.body
+			if body == "" {
+				body = valid
+			}
+			if err := a.AcceptSlackSocketEvent(context.Background(), "bot", json.RawMessage(body)); err == nil {
+				t.Fatal("invalid Socket ingress permitted transport ACK")
+			}
+			if len(s.inboxes) != 0 || len(s.invalidations) != 0 || len(s.conversationKeys) != 0 {
+				t.Fatal("invalid Socket ingress reached a durable operation")
+			}
+		})
+	}
+}
+
+func TestSlackWebhookRejectsSocketOnlyInstallation(t *testing.T) {
+	a, s, mux := newTestApp(t)
+	s.bot.Config.EventTransport = domain.SlackSocket
+	for _, body := range []string{
+		`{"type":"url_verification","challenge":"proof"}`,
+		slackBody(`{"type":"app_mention","user":"HUMAN","channel":"C1","text":"x","ts":"1800000000.000001"}`),
+	} {
+		w := signedSlackRequest(mux, body, "slack-signing", a.Now())
+		if w.Code != http.StatusNotFound || strings.Contains(w.Body.String(), "proof") {
+			t.Fatalf("Socket installation exposed a webhook receiver: %d %s", w.Code, w.Body.String())
+		}
+	}
+	if len(s.inboxes) != 0 || len(s.invalidations) != 0 {
+		t.Fatal("webhook request mutated a Socket-only installation")
 	}
 }
