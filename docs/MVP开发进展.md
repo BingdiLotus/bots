@@ -40,6 +40,7 @@
 - 2026-10-20：Slack 最小权限已完成。CLI 登录（A）后可读远端 manifest；`admin.apps:read/write`（B）位于 user scopes，导致 `apps.developerInstall` 返回 `restricted_scopes`，已确认移除全部 user scopes。最终 manifest 只保留 4 个 bot scopes，移除 bot_optional、未使用 user/channel/message.im events 和 Agent View；before/final SHA-256 `bc432d0a…`/`10a2bdb2…`。uninstall/install 轮换 token，旧 token `invalid_auth`；新 bot/app-level token 写回本地 env（0600），`scripts/check-slack-scopes.sh` 退出 0，Bot 重新邀请入频道，真实 smoke run `r_349e76f2…`、ts `1792479946.186979`、2,268 tokens。
 - 2026-10-20：unknown 人工处置完成（`e6a078c`）。管理 API 只接受 `unknown`；confirmed 必须带真实 provider message ID，rejected 必须带理由；行锁更新 delivery 和匹配 task（completed/canceled），写 `delivery_resolved` 审计，不调用 provider、不重试。PG/HTTP 回归覆盖状态、重复解析、跨 Bot 与非法输入。
 - 2026-10-20：部署/备份继续核查。`docker compose config` 对 `deploy/compose.bots.yml` 静态解析通过（healthcheck、127.0.0.1 绑定、只读 rootfs、restart、外部网络）；systemd 未在 Linux 执行。Chronotope 已有 D1 PITR、D3 Restate 卷恢复、D2 RustFS 回放脚本；Bots schema 与 Chronotope 同库，但本轮未执行破坏性全栈演练，联合 RTO/RPO 仍未证明。
+- 2026-10-20：Chronotope D1 PG PITR 隔离演练 6/6 通过（WAL 归档、basebackup、目标时刻回卷、目标后数据消失），未触碰现有 PG/Restate/Bots 数据，临时容器/卷已清理。D3 Restate 卷恢复与 D2 RustFS 未执行；Bots + Chronotope + Restate 联合 RTO/RPO 仍未证明。
 - 2026-10-20：P0 **尚未完成**。systemd/compose 模板未在目标主机执行；Chronotope/Restate 全栈备份与 RTO 未演练；真实移出 Bot/权限撤回演练和试用数据清理未做。见[P0 上线准备证据](evidence/P0-上线准备-2026-10-20.md)。
 
 ## 当前部署与下一步
