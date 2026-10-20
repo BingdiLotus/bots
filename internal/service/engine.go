@@ -304,7 +304,7 @@ func (e *Engine) collectRuns(ctx context.Context) error {
 		}
 		bound := run.Bound
 		want := agentRequest(bot, item.Revision, cfg).Config
-		if run.SessionID != item.RuntimeSessionID || bound.TenantID != item.TenantID || bound.SubjectRef != item.BotID || bound.ScopeID != item.ScopeID || bound.OriginCommandID != item.CommandID || bound.Model != cfg.Model || bound.AgentConfigVersion != 1 || bound.SpecDigest == "" || bound.ProtocolVersion != "1.0" || bound.DeadlineAt.IsZero() || domain.Hash(bound.AgentConfig) != domain.Hash(want) {
+		if run.SessionID != item.RuntimeSessionID || bound.TenantID != item.TenantID || bound.SubjectRef != item.BotID || bound.ScopeID != item.ScopeID || bound.OriginCommandID != item.CommandID || bound.Model != cfg.Model || bound.AgentConfigVersion != 1 || bound.SpecDigest == "" || bound.ProtocolVersion != "1.0" || bound.DeadlineAt.IsZero() || !sameAgentPolicy(bound.AgentConfig, want) {
 			e.Logger.Error("run binding mismatch; result left uncollected", "run_id", item.RunID)
 			continue
 		}
@@ -322,6 +322,18 @@ func (e *Engine) collectRuns(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// sameAgentPolicy compares the governance-bearing agent configuration. Tool
+// descriptions and schemas are code-defined and immutable with each runtime
+// agent; recomputing them from the current binary would reject runs from agents
+// created before a tool metadata change. Tool calls cannot gain authority from
+// that drift because the tool bridge validates every tool_ref and trusted
+// context, and the runtime agent was already approved with its own tool set.
+func sameAgentPolicy(got, want chronotope.AgentConfig) bool {
+	got.ApplicationTools = nil
+	want.ApplicationTools = nil
+	return domain.Hash(got) == domain.Hash(want)
 }
 
 func retryDelay(attempts int, err error) time.Duration {

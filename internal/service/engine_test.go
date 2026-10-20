@@ -46,6 +46,7 @@ type runtimeFixture struct {
 	drop        map[string]bool
 	holdResults bool
 	onRun       func(context.Context, string, chronotope.SubmitRunRequest, chronotope.Session) error
+	onGetRun    func(*chronotope.Run)
 }
 
 func newRuntimeFixture(t *testing.T, tenant string) *runtimeFixture {
@@ -77,6 +78,9 @@ func (f *runtimeFixture) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			run.Status = chronotope.RunRunning
 			run.Final = nil
 			run.Usage = nil
+		}
+		if f.onGetRun != nil {
+			f.onGetRun(&run)
 		}
 		jsonReply(w, 200, run)
 		return
@@ -417,6 +421,40 @@ func (f *engineFixture) deliveries(t *testing.T) []domain.Delivery {
 		t.Fatal(err)
 	}
 	return rows
+}
+
+func TestEngineCollectsRunFromAgentWithLegacyToolDefinitions(t *testing.T) {
+	f := setupEngine(t)
+	f.runtime.mu.Lock()
+	f.runtime.onGetRun = func(run *chronotope.Run) {
+		run.Bound.AgentConfig.ApplicationTools = []chronotope.ApplicationTool{{
+			ModelAlias: "legacy_recall", ToolRef: "legacy_recall", Description: "tool set from an earlier binary",
+			InputSchema: json.RawMessage(`{"type":"object"}`),
+		}}
+	}
+	f.runtime.mu.Unlock()
+	f.accept(t, "event-legacy-tools", "1700000000.000200")
+	f.drive(t, func() bool { return len(f.slack.messages()) == 1 })
+	if rows := f.deliveries(t); len(rows) != 1 || rows[0].State != "confirmed" {
+		t.Fatalf("legacy tool metadata blocked canonical result collection: %+v", rows)
+	}
+}
+
+func TestEngineRejectsRunWithDifferentAgentPolicy(t *testing.T) {
+	f := setupEngine(t)
+	f.runtime.mu.Lock()
+	f.runtime.onGetRun = func(run *chronotope.Run) {
+		run.Bound.AgentConfig.Instructions = "unapproved policy"
+	}
+	f.runtime.mu.Unlock()
+	f.accept(t, "event-tampered-policy", "1700000000.000300")
+	for range 12 {
+		f.step(t)
+		f.makeCommandsDue(t)
+	}
+	if len(f.slack.messages()) != 0 || len(f.deliveries(t)) != 0 {
+		t.Fatal("run with a different agent policy produced a final reply or delivery")
+	}
 }
 
 func TestEngineDurableHTTPChainAndFrozenSession(t *testing.T) {
