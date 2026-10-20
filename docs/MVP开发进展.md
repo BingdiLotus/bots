@@ -49,6 +49,7 @@
 - 2026-10-20：D2 修复与同窗口全栈恢复通过。Chronotope `c7b5e26` 修正 DR 测试的终态等待、幂等头、PG 计数和 RustFS 凭据，D2 4/4（replay=base=3）。同一维护窗口停 trial+全栈，卷备份/清空/回填 PG/Restate/RustFS；服务/trial ready **18.3s**，RPO **0**，RustFS 对象恢复可读，pending Restate timer 在 due+3.3s 投递 confirmed。
 - 2026-10-20：test-only loop budget + 自动多轮驱动器验证。`BOTS_TEST_MAX_PEER_ROUNDS=2` 为 per-bot/thread 进程内预算；`test/lab/drive.py` 以 Lab B 发起 3 次 peer 尝试，A 只接 2 次，第 3 次被截断；A/B final 均 confirmed，无 unknown/循环。它不替代全局预算，重启清零。详见[实验室证据](evidence/多Bot实验室-2026-10-20.md)。
 - 2026-10-20：test-only 2-Bot 真 Slack 实验室通过一跳验证：两个 tenant/app/容器，env-only peer allowlist 只接受显式 app_mention；A→B 转交 confirmed，B 接受；B 首次回复 transport unknown 已 resolve rejected，直接 @B confirmed；无隐式循环。Trial 暂停，Lab A 复用现有 app。新 app 仍有默认多余 scopes，test-only。详见[实验室证据](evidence/多Bot实验室-2026-10-20.md)。
+- 2026-10-21：release 收口。构建 `bingdi-bots:mvp-20261021`（digest `e9c7958b…`，15,779,454 B），trial 切到该镜像并 healthy/readyz 200；轮换 admin token（旧 401、新 200），trial 环境同步。当前工作树已移除真实 Slack app/bot/channel IDs；但 public 仓库历史仍含 test-only IDs，推送/CI 暂缓，需决定历史重写或 release 分支策略。
 - 2026-10-21：MVP 主链收口。停 test-only Lab A/B，启动 `bots-trial`；停用全栈演练知识（active knowledge 0），主线最终 smoke run `r_2ba155d6…`，final “主链可用” confirmed，真实 ts `1792537359.744669`；trial healthy/readyz 200。G0/G1/G2、P0 技术项和主线 smoke 已收口；剩余 owner/opt-in/指标/回滚、admin token 轮换、metrics/告警和 push/CI。
 - 2026-10-20：P0 **技术项完成**：Slack scopes、unknown 处置、权限撤回、Docker trial、独立频道/tenant、D1/D2/D3 与同窗口全栈恢复均通过。剩余 trial owner/opt-in/指标/回滚确认和可选 systemd；Docker trial 已上线。见[P0 上线准备证据](evidence/P0-上线准备-2026-10-20.md)。
 
