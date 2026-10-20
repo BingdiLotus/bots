@@ -24,10 +24,40 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	if len(os.Args) > 1 {
+		if len(os.Args) == 2 && os.Args[1] == "readyz" {
+			if err := probeReady(os.Getenv("BOTS_PROBE_URL")); err != nil {
+				logger.Error("readiness probe failed", "error", err)
+				os.Exit(1)
+			}
+			return
+		}
+		fmt.Fprintln(os.Stderr, "usage: bots [readyz]")
+		os.Exit(2)
+	}
 	if err := start(logger); err != nil {
 		logger.Error("bots stopped", "error", err)
 		os.Exit(1)
 	}
+}
+
+// probeReady lets a scratch container or service manager use the binary itself
+// as a healthcheck. The response body is deliberately ignored; only readiness
+// status matters and probes must not print dependency details.
+func probeReady(target string) error {
+	if target == "" {
+		target = "http://127.0.0.1:8090/readyz"
+	}
+	client := &http.Client{Timeout: 2 * time.Second}
+	response, err := client.Get(target)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("readiness returned HTTP %d", response.StatusCode)
+	}
+	return nil
 }
 
 func start(logger *slog.Logger) error {
@@ -106,6 +136,19 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}()
 	mux := httpapi.New()
 	app := &httpapi.App{Store: db, TenantID: bot.TenantID, AdminTokenEnv: cfg.AdminTokenEnv, InternalTokenEnv: cfg.InternalTokenEnv, UpdateConfig: engine.UpdateConfig}
+	readinessMaxAge := max(3*cfg.PollInterval, 60*time.Second)
+	app.Ready = func(ctx context.Context) error {
+		if err := db.Ping(ctx); err != nil {
+			return fmt.Errorf("database: %w", err)
+		}
+		if err := engine.Ready(ctx, readinessMaxAge); err != nil {
+			return fmt.Errorf("dispatcher: %w", err)
+		}
+		if socket != nil && !socket.Connected() {
+			return errors.New("Slack Socket Mode is not connected")
+		}
+		return nil
+	}
 	app.Register(mux)
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)
 	if err != nil {

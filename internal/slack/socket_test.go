@@ -113,6 +113,46 @@ func TestSocketRunAcknowledgesOnlyAfterAcceptanceAndPreservesPayload(t *testing.
 	}
 }
 
+func TestSocketConnectedTracksCurrentLifecycle(t *testing.T) {
+	transport := newFakeSocketTransport()
+	client := &SocketClient{transport: transport}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() {
+		result <- client.Run(ctx, func(context.Context, json.RawMessage) error { return nil })
+	}()
+	barrier := func(id string) {
+		transport.incoming <- socketmode.Event{Type: socketmode.EventTypeInteractive, Request: &socketmode.Request{Type: "interactive", EnvelopeID: id}}
+		if got := socketTestReceive(t, transport.acks); got != id {
+			t.Fatalf("barrier ACK = %q, want %q", got, id)
+		}
+	}
+	if client.Connected() {
+		t.Fatal("unconnected client reported ready")
+	}
+	transport.incoming <- socketmode.Event{Type: socketmode.EventTypeConnected}
+	barrier("connected")
+	if !client.Connected() {
+		t.Fatal("connected event did not mark the receiver ready")
+	}
+	transport.incoming <- socketmode.Event{Type: socketmode.EventTypeConnectionError, Data: &slackapi.ConnectionErrorEvent{ErrorObj: errors.New("temporary")}}
+	barrier("disconnected")
+	if client.Connected() {
+		t.Fatal("connection error left the receiver ready")
+	}
+	transport.incoming <- socketmode.Event{Type: socketmode.EventTypeConnected}
+	barrier("reconnected")
+	if !client.Connected() {
+		t.Fatal("reconnect did not restore readiness")
+	}
+	cancel()
+	_ = socketTestReceive(t, result)
+	if client.Connected() {
+		t.Fatal("Run return left the receiver ready")
+	}
+}
+
 func TestSocketRunLeavesAcceptanceErrorsUnacknowledgedAndContinues(t *testing.T) {
 	transport := newFakeSocketTransport()
 	client := &SocketClient{transport: transport}

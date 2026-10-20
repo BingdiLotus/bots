@@ -51,6 +51,12 @@ func Open(ctx context.Context, dsn string) (*Store, error) {
 	return &Store{Pool: pool}, nil
 }
 func (s *Store) Close() { s.Pool.Close() }
+func (s *Store) Ping(ctx context.Context) error {
+	if s == nil || s.Pool == nil {
+		return errors.New("store is not configured")
+	}
+	return s.Pool.Ping(ctx)
+}
 func (s *Store) Bootstrap(ctx context.Context) error {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {

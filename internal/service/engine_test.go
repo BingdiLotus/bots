@@ -505,8 +505,7 @@ func TestEngineDurableHTTPChainAndFrozenSession(t *testing.T) {
 	}
 	// Recreate the dispatcher and run startup recovery. Repair must come from
 	// PostgreSQL, while the HTTP runtime keeps its already accepted timer.
-	restarted := *f.engine
-	f.engine = &restarted
+	f.engine = freshEngine(f.engine)
 	if err := f.store.Recover(t.Context(), f.tenant); err != nil {
 		t.Fatal(err)
 	}

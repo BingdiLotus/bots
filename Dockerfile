@@ -14,4 +14,5 @@ COPY --from=build /out/bots /bots
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 ENV BOTS_HTTP_ADDR=:8090
 EXPOSE 8090
+HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=3 CMD ["/bots","readyz"]
 ENTRYPOINT ["/bots"]

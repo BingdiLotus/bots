@@ -42,11 +42,13 @@ type App struct {
 	AdminTokenEnv    string
 	InternalTokenEnv string
 	UpdateConfig     func(context.Context, string, string, int, domain.BotConfig) (domain.Bot, error)
+	Ready            func(context.Context) error
 	Now              func() time.Time
 }
 
 func (a *App) Register(mux *http.ServeMux) {
 	a.registerConsole(mux)
+	mux.HandleFunc("GET /readyz", a.readyz)
 	mux.HandleFunc("POST /internal/tools", a.executeTool)
 	mux.HandleFunc("POST /internal/timer-fires", a.acceptTimerFire)
 	mux.HandleFunc("GET /api/tenants/{tenant}/bots", a.listBots)
@@ -61,6 +63,23 @@ func (a *App) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/tenants/{tenant}/bots/{bot}/deliveries", a.listRecords)
 	mux.HandleFunc("GET /api/tenants/{tenant}/bots/{bot}/audit", a.listRecords)
 	mux.HandleFunc("POST /channels/slack/{tenant}/{bot}/events", a.slackEvents)
+}
+
+// readyz is an internal readiness probe, not a business endpoint. It reports
+// only a generic state so dependency errors and credential-bearing details never
+// reach probes or logs.
+func (a *App) readyz(w http.ResponseWriter, r *http.Request) {
+	if a.Ready == nil {
+		replyError(w, http.StatusServiceUnavailable, "not_ready", "readiness check is not configured")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	if err := a.Ready(ctx); err != nil {
+		replyError(w, http.StatusServiceUnavailable, "not_ready", "application dependencies are not ready")
+		return
+	}
+	replyJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 
 func (a *App) authenticate(w http.ResponseWriter, r *http.Request, reference string) bool {

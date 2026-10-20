@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -26,6 +27,7 @@ type SocketClient struct {
 	transport      socketTransport
 	firstConnected chan struct{}
 	connectedOnce  sync.Once
+	connected      atomic.Bool
 }
 
 type socketTransport interface {
@@ -65,8 +67,15 @@ func NewSocketClient(appToken string) (*SocketClient, error) {
 	return &SocketClient{transport: sdkSocketTransport{client}, firstConnected: make(chan struct{})}, nil
 }
 
+// Connected reports the current SDK connection state. It is false before the
+// first connection, after a connection error, and after Run returns; the SDK's
+// reconnect loop sets it true again on the next connected event.
+func (c *SocketClient) Connected() bool {
+	return c != nil && c.connected.Load()
+}
+
 // FirstConnected closes after the SDK first establishes a connection. It records
-// historical success only; it does not describe current health or readiness.
+// historical success only; use Connected for current readiness.
 func (c *SocketClient) FirstConnected() <-chan struct{} {
 	if c == nil {
 		return nil
@@ -88,6 +97,8 @@ func (c *SocketClient) Run(ctx context.Context, accept func(context.Context, jso
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	c.connected.Store(false)
+	defer c.connected.Store(false)
 	runCtx, cancel := context.WithCancel(ctx)
 	result := make(chan error, 1)
 	done := make(chan struct{})
@@ -118,15 +129,18 @@ func (c *SocketClient) Run(ctx context.Context, accept func(context.Context, jso
 				return ErrSocketTransport
 			}
 			if event.Type == socketmode.EventTypeConnected {
+				c.connected.Store(true)
 				if c.firstConnected != nil {
 					c.connectedOnce.Do(func() { close(c.firstConnected) })
 				}
 				continue
 			}
 			if event.Type == socketmode.EventTypeInvalidAuth {
+				c.connected.Store(false)
 				return ErrSocketAuthentication
 			}
 			if event.Type == socketmode.EventTypeConnectionError {
+				c.connected.Store(false)
 				if failure, ok := event.Data.(*slackapi.ConnectionErrorEvent); ok && socketAuthenticationError(failure.ErrorObj) {
 					return ErrSocketAuthentication
 				}

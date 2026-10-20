@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/bingdilotus/bots/internal/chronotope"
@@ -27,6 +28,7 @@ type Engine struct {
 	Interval time.Duration
 	Logger   *slog.Logger
 	lease    *store.TenantLease
+	lastStep atomic.Int64
 }
 
 var errLeaseLost = errors.New("dispatcher lease lost")
@@ -122,7 +124,33 @@ func (e *Engine) Step(ctx context.Context) error {
 	if err := e.collectRuns(ctx); err != nil {
 		return err
 	}
-	return e.sendDeliveries(ctx)
+	if err := e.sendDeliveries(ctx); err != nil {
+		return err
+	}
+	// Readiness observes completed loop progress, not merely a live process.
+	// A persistent step failure therefore keeps the instance unready.
+	e.lastStep.Store(time.Now().UnixNano())
+	return nil
+}
+
+// Ready reports whether this process still owns the tenant dispatcher and its
+// loop completed a step recently. It is deliberately independent of Bot enabled
+// state: a paused Bot is still an administrable, running process.
+func (e *Engine) Ready(ctx context.Context, maxAge time.Duration) error {
+	if e == nil || e.lease == nil {
+		return errors.New("dispatcher is not initialized")
+	}
+	if maxAge <= 0 {
+		return domain.ErrInvalid
+	}
+	if err := e.lease.Check(ctx); err != nil {
+		return fmt.Errorf("dispatcher lease: %w", err)
+	}
+	last := e.lastStep.Load()
+	if last == 0 || time.Since(time.Unix(0, last)) > maxAge {
+		return errors.New("dispatcher has not completed a step recently")
+	}
+	return nil
 }
 
 func (e *Engine) prepareInbox(ctx context.Context) error {
