@@ -45,6 +45,9 @@ type App struct {
 	UpdateConfig     func(context.Context, string, string, int, domain.BotConfig) (domain.Bot, error)
 	Ready            func(context.Context) error
 	Now              func() time.Time
+	// TestAllowedBotIDs is populated only by the test lab env. Empty keeps the
+	// production behavior of dropping every bot-authored Slack message.
+	TestAllowedBotIDs map[string]bool
 }
 
 func (a *App) Register(mux *http.ServeMux) {

@@ -11,6 +11,20 @@
 
 两个 Bot 同一私有频道 `#bingdi-bots-lab`，各自一个 Bots 容器、tenant key、Chronotope bridge/timer。Trial 的 `bots-trial` 与 Lab A 使用同一个 Slack app token，不能同时运行；跑 Lab 时暂停 trial，结束后恢复。Lab B 使用独立 app/token。
 
+## Peer bot allowlist（lab-only）
+
+两个 bot 直接互 @ 需要显式测试开关：
+
+```sh
+BOTS_TEST_ALLOWED_BOT_IDS=B0PEER1,B0PEER2
+```
+
+- 只接受 peer bot 的 **app_mention**；普通 bot 消息、thread reply、被编辑/删除的 bot 消息仍全部过滤，避免隐式自循环。
+- 自身 bot user 永远过滤；默认空，不设置时生产行为不变。
+- 启动时若非空会打一条 `test-only peer bot allowlist enabled` 警告。
+- 它不是 seed/config/API 字段，只存在于 lab 容器 env；不要让生产进程设置。
+- 两个 bot 的 instructions 必须限制“最多回复一轮、非必要不再 @ 对方”，并在实验中手动监控；该开关不提供全局轮次预算。
+
 ## 关键边界
 
 - 一个 Slack App 只有一个 bot user；两个真实 bot 需要两个 app 安装。

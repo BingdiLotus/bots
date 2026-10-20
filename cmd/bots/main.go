@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +22,17 @@ import (
 	"github.com/bingdilotus/bots/internal/slack"
 	"github.com/bingdilotus/bots/internal/store"
 )
+
+func parseBotIDAllowlist(raw string) map[string]bool {
+	out := map[string]bool{}
+	for _, id := range strings.Split(raw, ",") {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			out[id] = true
+		}
+	}
+	return out
+}
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -135,7 +147,11 @@ func serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		_ = release(closeCtx)
 	}()
 	mux := httpapi.New()
-	app := &httpapi.App{Store: db, TenantID: bot.TenantID, AdminTokenEnv: cfg.AdminTokenEnv, InternalTokenEnv: cfg.InternalTokenEnv, UpdateConfig: engine.UpdateConfig}
+	allowedBotIDs := parseBotIDAllowlist(os.Getenv("BOTS_TEST_ALLOWED_BOT_IDS"))
+	if len(allowedBotIDs) > 0 {
+		slog.Warn("test-only peer bot allowlist enabled", "count", len(allowedBotIDs))
+	}
+	app := &httpapi.App{Store: db, TenantID: bot.TenantID, AdminTokenEnv: cfg.AdminTokenEnv, InternalTokenEnv: cfg.InternalTokenEnv, UpdateConfig: engine.UpdateConfig, TestAllowedBotIDs: allowedBotIDs}
 	readinessMaxAge := max(3*cfg.PollInterval, 60*time.Second)
 	app.Ready = func(ctx context.Context) error {
 		if err := db.Ping(ctx); err != nil {

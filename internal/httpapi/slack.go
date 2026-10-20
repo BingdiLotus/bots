@@ -101,7 +101,7 @@ func (a *App) AcceptSlackSocketEvent(ctx context.Context, botID string, body jso
 }
 
 func (a *App) admitSlackEnvelope(ctx context.Context, bot domain.Bot, envelope slack.Envelope) (map[string]any, error) {
-	event, ok, err := slack.Normalize(slack.Binding{TenantID: bot.TenantID, BotID: bot.ID, AccountID: bot.Config.InstallationID, TeamID: bot.Config.WorkspaceID, ChannelID: bot.Config.ChannelID, BotUserID: bot.Config.BotUserID}, envelope)
+	event, ok, err := slack.Normalize(slack.Binding{TenantID: bot.TenantID, BotID: bot.ID, AccountID: bot.Config.InstallationID, TeamID: bot.Config.WorkspaceID, ChannelID: bot.Config.ChannelID, BotUserID: bot.Config.BotUserID, AllowedBotIDs: a.TestAllowedBotIDs}, envelope)
 	if err != nil {
 		return nil, errSlackBinding
 	}

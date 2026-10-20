@@ -17,6 +17,9 @@ type Binding struct {
 	AppID     string
 	ChannelID string
 	BotUserID string
+	// AllowedBotIDs is a test-lab allowlist. A peer bot is admitted only for an
+	// explicit app_mention; implicit thread replies remain filtered to avoid loops.
+	AllowedBotIDs map[string]bool
 }
 
 type Envelope struct {
@@ -105,6 +108,11 @@ func isBot(message *wireMessage, binding Binding) bool {
 	return message != nil && (message.BotID != "" || message.Subtype == "bot_message" || len(message.BotProfile) > 0 && string(message.BotProfile) != "null" || binding.BotUserID != "" && message.User == binding.BotUserID)
 }
 
+func peerMentionAllowed(message *wireMessage, binding Binding) bool {
+	return message != nil && message.Type == "app_mention" && message.BotID != "" &&
+		message.User != binding.BotUserID && binding.AllowedBotIDs[message.BotID]
+}
+
 // Normalize returns thread replies as candidates. The caller must check its
 // durable subscribed-thread mapping before admitting one as a command. Source
 // changes/deletions are separate invalidation events, never fresh model input.
@@ -125,7 +133,7 @@ func Normalize(binding Binding, envelope Envelope) (Event, bool, error) {
 	if message.Channel != binding.ChannelID {
 		return Event{}, false, nil
 	}
-	if isBot(&message, binding) {
+	if isBot(&message, binding) && !peerMentionAllowed(&message, binding) {
 		return Event{}, false, nil
 	}
 	event := Event{EventID: envelope.EventID, TenantID: binding.TenantID, BotID: binding.BotID, AccountID: binding.AccountID,

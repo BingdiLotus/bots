@@ -374,3 +374,27 @@ func TestSlackWebhookRejectsSocketOnlyInstallation(t *testing.T) {
 		t.Fatal("webhook request mutated a Socket-only installation")
 	}
 }
+
+func TestSlackSocketTestPeerMentionAllowlistIsExplicitOnly(t *testing.T) {
+	a, s, _ := newTestApp(t)
+	s.bot.Config.EventTransport = domain.SlackSocket
+	a.TestAllowedBotIDs = map[string]bool{"BPEER": true, "BSELF": true}
+	peer := slackBody(`{"type":"app_mention","user":"U_PEER","bot_id":"BPEER","channel":"C1","text":"<@U_BOT> hello","ts":"1800000010.000001"}`)
+	if err := a.AcceptSlackSocketEvent(context.Background(), "bot", json.RawMessage(peer)); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.inboxes) != 1 {
+		t.Fatalf("allowed peer mention inboxes = %d", len(s.inboxes))
+	}
+	thread := slackBody(`{"type":"message","user":"U_PEER","bot_id":"BPEER","channel":"C1","text":"implicit","ts":"1800000011.000001","thread_ts":"1800000010.000001"}`)
+	if err := a.AcceptSlackSocketEvent(context.Background(), "bot", json.RawMessage(thread)); err != nil {
+		t.Fatal(err)
+	}
+	self := slackBody(`{"type":"app_mention","user":"U_BOT","bot_id":"BSELF","channel":"C1","text":"<@U_BOT> self","ts":"1800000012.000001"}`)
+	if err := a.AcceptSlackSocketEvent(context.Background(), "bot", json.RawMessage(self)); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.inboxes) != 1 {
+		t.Fatalf("peer thread/self message was admitted: inboxes=%d", len(s.inboxes))
+	}
+}
