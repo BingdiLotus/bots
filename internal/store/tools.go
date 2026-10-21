@@ -15,6 +15,8 @@ import (
 
 const taskColumns = `id,tenant_id,bot_id,scope_id,origin_command_id,reminder_slot,text,due_at,status,revision,timer_id,timer_handle,fire_id,delivery_id,target,created_at`
 
+const forgetConfirmationTTL = 10 * time.Minute
+
 func scanTask(row pgx.Row) (domain.Task, error) {
 	var t domain.Task
 	var target []byte
@@ -50,13 +52,13 @@ func toolError(err error) json.RawMessage {
 		code = "pending_task_limit"
 	case errors.Is(err, domain.ErrDisabled):
 		code = "disabled"
-	case errors.Is(err, domain.ErrConfirmation):
-		code = "confirmation_required"
+	case errors.Is(err, domain.ErrConfirmationInvalid):
+		code = "confirmation_invalid"
 	}
 	return raw(map[string]any{"error": map[string]string{"code": code, "message": err.Error()}})
 }
 func businessError(err error) bool {
-	return errors.Is(err, domain.ErrInvalid) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrBusy) || errors.Is(err, domain.ErrLimit) || errors.Is(err, domain.ErrDisabled) || errors.Is(err, domain.ErrConfirmation)
+	return errors.Is(err, domain.ErrInvalid) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrBusy) || errors.Is(err, domain.ErrLimit) || errors.Is(err, domain.ErrDisabled) || errors.Is(err, domain.ErrConfirmationInvalid)
 }
 
 // readOnlyTool returns a scoped projection without creating an operation
@@ -199,14 +201,9 @@ func (s *Store) ExecuteTool(ctx context.Context, call domain.ToolCall) (json.Raw
 		var args struct {
 			KnowledgeID      string `json:"knowledge_id"`
 			ExpectedRevision int    `json:"expected_revision"`
-			Confirm          bool   `json:"confirm"`
 		}
 		err = parseArguments(call.Arguments, &args)
 		if err != nil {
-			break
-		}
-		if !args.Confirm {
-			err = domain.ErrConfirmation
 			break
 		}
 		if args.KnowledgeID == "" || args.ExpectedRevision < 1 {
@@ -222,9 +219,65 @@ func (s *Store) ExecuteTool(ctx context.Context, call domain.ToolCall) (json.Raw
 			err = domain.ErrConflict
 			break
 		}
+		if _, err = tx.Exec(ctx, `DELETE FROM bots.memory_confirmations WHERE expires_at <= now() OR used_at IS NOT NULL`); err != nil {
+			break
+		}
+		token, tokenErr := domain.NewID("confirm_")
+		if tokenErr != nil {
+			return nil, tokenErr
+		}
+		expiresAt := time.Now().UTC().Add(forgetConfirmationTTL)
+		_, err = tx.Exec(ctx, `INSERT INTO bots.memory_confirmations(token,tenant_id,bot_id,scope_id,knowledge_id,knowledge_revision,requested_command_id,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, token, c.TenantID, c.SubjectRef, c.ScopeID, memory.ID, memory.Revision, c.OriginCommandID, expiresAt)
+		if err == nil {
+			err = audit(ctx, tx, scope, "memory_forget_requested", memory.ID, memory.Revision, "tool", map[string]string{"operation_id": c.OperationID, "command_id": c.OriginCommandID, "content_hash": domain.Hash(memory.Content), "confirmation_token_hash": domain.Hash(token)})
+		}
+		value = map[string]any{"status": "confirmation_required", "confirmation_token": token, "knowledge_id": memory.ID, "expected_revision": memory.Revision, "expires_at": expiresAt}
+	case "confirm_forget_memory":
+		var args struct {
+			ConfirmationToken string `json:"confirmation_token"`
+			KnowledgeID       string `json:"knowledge_id"`
+			ExpectedRevision  int    `json:"expected_revision"`
+		}
+		err = parseArguments(call.Arguments, &args)
+		if err != nil {
+			break
+		}
+		if args.ConfirmationToken == "" || args.KnowledgeID == "" || args.ExpectedRevision < 1 {
+			err = domain.ErrConfirmationInvalid
+			break
+		}
+		var requestedCommand string
+		err = tx.QueryRow(ctx, `SELECT requested_command_id FROM bots.memory_confirmations WHERE token=$1 AND tenant_id=$2 AND bot_id=$3 AND scope_id=$4 AND knowledge_id=$5 AND knowledge_revision=$6 AND expires_at > now() AND used_at IS NULL FOR UPDATE`, args.ConfirmationToken, c.TenantID, c.SubjectRef, c.ScopeID, args.KnowledgeID, args.ExpectedRevision).Scan(&requestedCommand)
+		if errors.Is(err, pgx.ErrNoRows) {
+			err = domain.ErrConfirmationInvalid
+			break
+		}
+		if err != nil {
+			break
+		}
+		if requestedCommand == c.OriginCommandID {
+			err = domain.ErrConfirmationInvalid
+			break
+		}
+		var memory domain.Knowledge
+		memory, err = scanKnowledge(tx.QueryRow(ctx, `SELECT `+knowledgeColumns+` FROM bots.knowledge WHERE id=$1 AND tenant_id=$2 AND bot_id=$3 AND scope_id=$4 AND active FOR UPDATE`, args.KnowledgeID, c.TenantID, c.SubjectRef, c.ScopeID))
+		if errors.Is(err, domain.ErrNotFound) {
+			err = domain.ErrConfirmationInvalid
+			break
+		}
+		if err != nil {
+			break
+		}
+		if memory.Revision != args.ExpectedRevision {
+			err = domain.ErrConfirmationInvalid
+			break
+		}
 		_, err = tx.Exec(ctx, `UPDATE bots.knowledge SET active=false,revision=revision+1 WHERE id=$1`, memory.ID)
 		if err == nil {
-			err = audit(ctx, tx, scope, "knowledge_forgotten", memory.ID, args.ExpectedRevision+1, "tool", map[string]string{"operation_id": c.OperationID, "command_id": c.OriginCommandID, "content_hash": domain.Hash(memory.Content)})
+			_, err = tx.Exec(ctx, `UPDATE bots.memory_confirmations SET used_at=now() WHERE token=$1`, args.ConfirmationToken)
+		}
+		if err == nil {
+			err = audit(ctx, tx, scope, "knowledge_forgotten", memory.ID, args.ExpectedRevision+1, "tool", map[string]string{"operation_id": c.OperationID, "command_id": c.OriginCommandID, "content_hash": domain.Hash(memory.Content), "confirmation_token_hash": domain.Hash(args.ConfirmationToken)})
 		}
 		value = map[string]any{"knowledge_id": memory.ID, "revision": args.ExpectedRevision + 1, "active": false}
 	case "create_reminder":

@@ -47,7 +47,7 @@ func setupPG(t *testing.T) fixture {
 		tx, err := s.Pool.Begin(ctx)
 		if err == nil {
 			defer tx.Rollback(ctx)
-			for _, table := range []string{"audit_events", "deliveries", "command_outbox", "tasks", "knowledge", "inbox", "runtime_sessions", "bots"} {
+			for _, table := range []string{"audit_events", "deliveries", "command_outbox", "tasks", "knowledge", "memory_confirmations", "inbox", "runtime_sessions", "bots"} {
 				if _, err := tx.Exec(ctx, `DELETE FROM bots.`+table+` WHERE tenant_id=$1`, tenant); err != nil {
 					t.Log(err)
 				}

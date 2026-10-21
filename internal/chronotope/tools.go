@@ -34,8 +34,13 @@ func NativeTools() []ApplicationTool {
 		},
 		{
 			ModelAlias: "forget_memory", ToolRef: "forget_memory",
-			Description: "在用户明确要求忘记并确认后，按knowledge_id和expected_revision停用当前频道的一条长期记忆；必须先用list_memories取得id和revision，confirm必须为true。只停用，不删除审计，不影响其它scope。",
-			InputSchema: json.RawMessage(`{"type":"object","properties":{"knowledge_id":{"type":"string","minLength":1},"expected_revision":{"type":"integer","minimum":1},"confirm":{"type":"boolean","description":"只有用户明确确认忘记后才设为true"}},"required":["knowledge_id","expected_revision","confirm"],"additionalProperties":false}`),
+			Description: "请求停用当前频道的一条长期记忆，不会立即删除；必须先用list_memories取得knowledge_id和expected_revision。返回一次性confirmation_token和待确认摘要；向用户展示摘要并请其明确确认，不要在同一个用户消息里直接确认，也不要把token展示给用户。",
+			InputSchema: json.RawMessage(`{"type":"object","properties":{"knowledge_id":{"type":"string","minLength":1},"expected_revision":{"type":"integer","minimum":1}},"required":["knowledge_id","expected_revision"],"additionalProperties":false}`),
+		},
+		{
+			ModelAlias: "confirm_forget_memory", ToolRef: "confirm_forget_memory",
+			Description: "使用上一轮forget_memory返回的confirmation_token，在用户后续明确确认后停用记忆。token绑定当前频道、knowledge_id和revision，10分钟有效且只能使用一次；必须来自后续用户消息，不能在同一消息内确认。",
+			InputSchema: json.RawMessage(`{"type":"object","properties":{"confirmation_token":{"type":"string","minLength":1},"knowledge_id":{"type":"string","minLength":1},"expected_revision":{"type":"integer","minimum":1}},"required":["confirmation_token","knowledge_id","expected_revision"],"additionalProperties":false}`),
 		},
 		{
 			ModelAlias: "create_reminder", ToolRef: "create_reminder",
