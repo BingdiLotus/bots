@@ -70,7 +70,8 @@ list_memories -> forget_memory(confirm=true, expected_revision=1)
 
 ## 边界
 
+- 本文记录的是**旧一步 confirm 实现**的 smoke；当前代码已改为 `forget_memory` 请求 token + `confirm_forget_memory` 后续消息消费，本文的 forget 结果不能作为新实现验收。任务/记忆查询结果仍有效。
 - `list_reminders` 的真实 Slack 未单独调用；它与 `list_tasks` 共用同一只读 handler，已有 PG 回归，仍建议下一次 smoke 覆盖别名。
-- 本次 forget 的确认来自用户明确的“忘掉…”请求；模型据此传 `confirm=true`，没有二次 UI/服务端确认。若要防止模型在模糊语句下直接停用，后续应增加两步确认或服务端 confirmation token。
+- 两步 token 的新真实 Slack smoke 待短 trial。
 - 这是真实 Slack smoke，不是正式团队 trial；数据写入现有 trial tenant，未新建频道/Bot 组织。
 - smoke 容器在提醒到点后停止（`exited`，8090 free）；trial 业务数据保留。
