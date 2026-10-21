@@ -27,7 +27,8 @@ create_reminder -> list_tasks
 - run `r_299dcc00…` completed，3 次 LLM call；
 - task `task_ce2a668f…` 创建为 `scheduled`，due `2026-10-21 13:54:56 Asia/Shanghai`；
 - final 明确列出 scheduled 提醒；
-- final delivery **confirmed**，真实 ts `1792561510.560899`。
+- final delivery **confirmed**，真实 ts `1792561510.560899`；
+- 到点 reminder delivery **confirmed**，真实 ts `1792562097.745569`，task `completed`。
 
 ### 2. Memory 查询
 
@@ -72,4 +73,4 @@ list_memories -> forget_memory(confirm=true, expected_revision=1)
 - `list_reminders` 的真实 Slack 未单独调用；它与 `list_tasks` 共用同一只读 handler，已有 PG 回归，仍建议下一次 smoke 覆盖别名。
 - 本次 forget 的确认来自用户明确的“忘掉…”请求；模型据此传 `confirm=true`，没有二次 UI/服务端确认。若要防止模型在模糊语句下直接停用，后续应增加两步确认或服务端 confirmation token。
 - 这是真实 Slack smoke，不是正式团队 trial；数据写入现有 trial tenant，未新建频道/Bot 组织。
-- smoke 容器在提醒到点后停止；trial 业务数据保留。
+- smoke 容器在提醒到点后停止（`exited`，8090 free）；trial 业务数据保留。
