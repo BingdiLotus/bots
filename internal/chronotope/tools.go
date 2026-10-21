@@ -4,7 +4,7 @@ import "encoding/json"
 
 // NativeTools returns a fresh fixed model registry. Identity, source references,
 // reply targets, and deduplication keys belong to trusted call context, never
-// these model parameters. Internal tool refs match the bridge's five operations.
+// these model parameters. Internal tool refs match the bridge's native operations.
 func NativeTools() []ApplicationTool {
 	return []ApplicationTool{
 		{
@@ -16,6 +16,26 @@ func NativeTools() []ApplicationTool {
 			ModelAlias: "recall", ToolRef: "recall",
 			Description: "检索当前授权作用域内有效的知识或经验，返回内容、来源及revision。其它频道、Bot或租户的资产不可读取。",
 			InputSchema: json.RawMessage(`{"type":"object","properties":{"query":{"type":"string","description":"检索关键词，多个关键词以空格分隔；返回命中关键词更多的有效知识；空字符串用于最近有效知识"}},"required":["query"],"additionalProperties":false}`),
+		},
+		{
+			ModelAlias: "list_tasks", ToolRef: "list_tasks",
+			Description: "只读列出当前授权频道内尚未完成或取消的原生提醒/任务，按到期时间升序返回task_id、status、due_at、text和revision。用户问“我有哪些待办/提醒”时使用；不创建、不改期、不发送。",
+			InputSchema: json.RawMessage(`{"type":"object","properties":{},"required":[],"additionalProperties":false}`),
+		},
+		{
+			ModelAlias: "list_reminders", ToolRef: "list_reminders",
+			Description: "只读列出当前授权频道内尚未完成或取消的提醒，与list_tasks共用同一原生任务事实；用于用户问“定时任务/提醒”。不创建、不改期、不发送。",
+			InputSchema: json.RawMessage(`{"type":"object","properties":{},"required":[],"additionalProperties":false}`),
+		},
+		{
+			ModelAlias: "list_memories", ToolRef: "list_memories",
+			Description: "只读列出当前授权频道内仍然有效的长期记忆/知识，返回knowledge_id、content、kind、revision和created_at。用户问“你记得我什么”时使用；同thread历史不等于跨thread长期记忆；不读取其它频道、Bot或租户。",
+			InputSchema: json.RawMessage(`{"type":"object","properties":{},"required":[],"additionalProperties":false}`),
+		},
+		{
+			ModelAlias: "forget_memory", ToolRef: "forget_memory",
+			Description: "在用户明确要求忘记并确认后，按knowledge_id和expected_revision停用当前频道的一条长期记忆；必须先用list_memories取得id和revision，confirm必须为true。只停用，不删除审计，不影响其它scope。",
+			InputSchema: json.RawMessage(`{"type":"object","properties":{"knowledge_id":{"type":"string","minLength":1},"expected_revision":{"type":"integer","minimum":1},"confirm":{"type":"boolean","description":"只有用户明确确认忘记后才设为true"}},"required":["knowledge_id","expected_revision","confirm"],"additionalProperties":false}`),
 		},
 		{
 			ModelAlias: "create_reminder", ToolRef: "create_reminder",

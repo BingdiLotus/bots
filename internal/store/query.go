@@ -102,6 +102,30 @@ func (s *Store) GetTask(ctx context.Context, scope domain.Scope, id string) (dom
 	}
 	return scanTask(s.Pool.QueryRow(ctx, `SELECT `+taskColumns+` FROM bots.tasks WHERE id=$1 AND tenant_id=$2 AND bot_id=$3 AND ($4='' OR scope_id=$4)`, id, scope.TenantID, scope.BotID, scope.ScopeID))
 }
+func queryOpenTasks(ctx context.Context, q reader, scope domain.Scope, n int) ([]domain.Task, error) {
+	if !scopeValid(scope) {
+		return nil, domain.ErrInvalid
+	}
+	rows, err := q.Query(ctx, `SELECT `+taskColumns+` FROM bots.tasks WHERE tenant_id=$1 AND bot_id=$2 AND ($3='' OR scope_id=$3) AND status NOT IN ('completed','canceled') ORDER BY due_at ASC,id LIMIT $4`, scope.TenantID, scope.BotID, scope.ScopeID, limit(n))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []domain.Task{}
+	for rows.Next() {
+		item, err := scanTask(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) ListOpenTasks(ctx context.Context, scope domain.Scope, n int) ([]domain.Task, error) {
+	return queryOpenTasks(ctx, s.Pool, scope, n)
+}
+
 func (s *Store) ListTasks(ctx context.Context, scope domain.Scope, n int) ([]domain.Task, error) {
 	if !scopeValid(scope) {
 		return nil, domain.ErrInvalid

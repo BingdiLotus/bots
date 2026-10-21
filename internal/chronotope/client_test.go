@@ -54,7 +54,7 @@ func requireAPIError(t *testing.T, err error, kind ErrorKind, status int) *APIEr
 
 func TestClientExercisesActualApplicationWire(t *testing.T) {
 	ctx := context.Background()
-	input := CreateAgentRequest{Name: "bot", Config: AgentConfig{Model: "model-1", Instructions: "Use the five native tools.", Tools: []string{}, Version: 1, ApplicationProfile: true, ApplicationBridgeRef: "bots", ApplicationTools: NativeTools(), MaxOutputTokens: 256, MaxSteps: 8, MaxDurationMS: 60000}}
+	input := CreateAgentRequest{Name: "bot", Config: AgentConfig{Model: "model-1", Instructions: "Use the native tools.", Tools: []string{}, Version: 1, ApplicationProfile: true, ApplicationBridgeRef: "bots", ApplicationTools: NativeTools(), MaxOutputTokens: 256, MaxSteps: 8, MaxDurationMS: 60000}}
 	timerInput := TimerRequest{TenantID: "tenant & 1", SubjectRef: "bot?1", ScopeID: "scope+1", TimerID: "task/with?#id", Revision: 2,
 		DueAt: time.Date(2026, 10, 20, 12, 3, 4, 123456789, time.FixedZone("CST", 8*3600)), OpaqueActionRef: "task-1"}
 	timerResponse := Timer{TimerRequest: timerInput, TimerHandle: "timer-stable", FireID: "fire-stable", State: "pending"}

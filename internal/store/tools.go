@@ -50,11 +50,29 @@ func toolError(err error) json.RawMessage {
 		code = "pending_task_limit"
 	case errors.Is(err, domain.ErrDisabled):
 		code = "disabled"
+	case errors.Is(err, domain.ErrConfirmation):
+		code = "confirmation_required"
 	}
 	return raw(map[string]any{"error": map[string]string{"code": code, "message": err.Error()}})
 }
 func businessError(err error) bool {
-	return errors.Is(err, domain.ErrInvalid) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrBusy) || errors.Is(err, domain.ErrLimit) || errors.Is(err, domain.ErrDisabled)
+	return errors.Is(err, domain.ErrInvalid) || errors.Is(err, domain.ErrConflict) || errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrBusy) || errors.Is(err, domain.ErrLimit) || errors.Is(err, domain.ErrDisabled) || errors.Is(err, domain.ErrConfirmation)
+}
+
+// readOnlyTool returns a scoped projection without creating an operation
+// receipt or mutation audit. The projection still runs inside the tool
+// transaction and validates the origin run/session like any other tool.
+func readOnlyTool(ref string) bool {
+	switch ref {
+	case "recall", "list_tasks", "list_reminders", "list_memories":
+		return true
+	default:
+		return false
+	}
+}
+
+func taskSummary(task domain.Task) map[string]any {
+	return map[string]any{"task_id": task.ID, "status": task.Status, "due_at": task.DueAt, "text": task.Text, "revision": task.Revision}
 }
 
 // ExecuteTool commits the operation receipt, native mutation, outbox and audit
@@ -151,6 +169,64 @@ func (s *Store) ExecuteTool(ctx context.Context, call domain.ToolCall) (json.Raw
 		var items []domain.Knowledge
 		items, err = queryKnowledge(ctx, tx, scope, args.Query, 20)
 		value = map[string]any{"items": items}
+	case "list_tasks", "list_reminders":
+		var args struct{}
+		err = parseArguments(call.Arguments, &args)
+		if err != nil {
+			break
+		}
+		var tasks []domain.Task
+		tasks, err = queryOpenTasks(ctx, tx, scope, 20)
+		items := make([]map[string]any, 0, len(tasks))
+		for _, task := range tasks {
+			items = append(items, taskSummary(task))
+		}
+		value = map[string]any{"items": items, "count": len(items)}
+	case "list_memories":
+		var args struct{}
+		err = parseArguments(call.Arguments, &args)
+		if err != nil {
+			break
+		}
+		var memories []domain.Knowledge
+		memories, err = queryKnowledge(ctx, tx, scope, "", 20)
+		items := make([]map[string]any, 0, len(memories))
+		for _, memory := range memories {
+			items = append(items, map[string]any{"knowledge_id": memory.ID, "content": memory.Content, "kind": memory.Kind, "revision": memory.Revision, "created_at": memory.CreatedAt})
+		}
+		value = map[string]any{"items": items, "count": len(items)}
+	case "forget_memory":
+		var args struct {
+			KnowledgeID      string `json:"knowledge_id"`
+			ExpectedRevision int    `json:"expected_revision"`
+			Confirm          bool   `json:"confirm"`
+		}
+		err = parseArguments(call.Arguments, &args)
+		if err != nil {
+			break
+		}
+		if !args.Confirm {
+			err = domain.ErrConfirmation
+			break
+		}
+		if args.KnowledgeID == "" || args.ExpectedRevision < 1 {
+			err = domain.ErrInvalid
+			break
+		}
+		var memory domain.Knowledge
+		memory, err = scanKnowledge(tx.QueryRow(ctx, `SELECT `+knowledgeColumns+` FROM bots.knowledge WHERE id=$1 AND tenant_id=$2 AND bot_id=$3 AND scope_id=$4 AND active FOR UPDATE`, args.KnowledgeID, c.TenantID, c.SubjectRef, c.ScopeID))
+		if err != nil {
+			break
+		}
+		if memory.Revision != args.ExpectedRevision {
+			err = domain.ErrConflict
+			break
+		}
+		_, err = tx.Exec(ctx, `UPDATE bots.knowledge SET active=false,revision=revision+1 WHERE id=$1`, memory.ID)
+		if err == nil {
+			err = audit(ctx, tx, scope, "knowledge_forgotten", memory.ID, args.ExpectedRevision+1, "tool", map[string]string{"operation_id": c.OperationID, "command_id": c.OriginCommandID, "content_hash": domain.Hash(memory.Content)})
+		}
+		value = map[string]any{"knowledge_id": memory.ID, "revision": args.ExpectedRevision + 1, "active": false}
 	case "create_reminder":
 		var args struct {
 			DueAt time.Time `json:"due_at"`
@@ -279,7 +355,7 @@ func (s *Store) ExecuteTool(ctx context.Context, call domain.ToolCall) (json.Raw
 	} else {
 		result = raw(value)
 	}
-	if call.ToolRef != "recall" {
+	if !readOnlyTool(call.ToolRef) {
 		_, err = tx.Exec(ctx, `INSERT INTO bots.inbox(id,tenant_id,bot_id,scope_id,namespace,source_id,request_hash,state,result,run_id,session_key,revision,runtime_session_id,input) VALUES($1,$2,$3,$4,'tool',$5,$6,'complete',$7,$8,$9,$10,$11,$12)`, domain.StableID("operation_", c.TenantID, c.SubjectRef, c.OperationID), c.TenantID, c.SubjectRef, c.ScopeID, c.OperationID, hash, result, c.RunID, origin.SessionKey, origin.Revision, origin.RuntimeSessionID, call.ToolRef)
 		if err != nil {
 			return nil, err
