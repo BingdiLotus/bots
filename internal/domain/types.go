@@ -11,12 +11,13 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("not found")
-	ErrConflict = errors.New("request or revision conflict")
-	ErrDisabled = errors.New("bot or account disabled")
-	ErrBusy     = errors.New("operation already in flight or result unknown")
-	ErrLimit    = errors.New("pending task limit reached")
-	ErrInvalid  = errors.New("invalid request")
+	ErrNotFound     = errors.New("not found")
+	ErrConflict     = errors.New("request or revision conflict")
+	ErrDisabled     = errors.New("bot or account disabled")
+	ErrBusy         = errors.New("operation already in flight or result unknown")
+	ErrLimit        = errors.New("pending task limit reached")
+	ErrInvalid      = errors.New("invalid request")
+	ErrConfirmation = errors.New("explicit confirmation required")
 )
 
 type Scope struct {

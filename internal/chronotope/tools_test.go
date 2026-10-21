@@ -11,10 +11,12 @@ func TestAllNativeSchemasContainOnlyBusinessParameters(t *testing.T) {
 	want := map[string][]string{
 		"remember": {"content", "kind"}, "recall": {"query"}, "create_reminder": {"due_at", "text"},
 		"update_reminder": {"task_id", "expected_revision", "due_at", "text"}, "cancel_reminder": {"task_id", "expected_revision"},
+		"list_tasks": {}, "list_reminders": {}, "list_memories": {},
+		"forget_memory": {"knowledge_id", "expected_revision", "confirm"},
 	}
 	tools := NativeTools()
-	if len(tools) != 5 {
-		t.Fatalf("want exactly five native tools: %d", len(tools))
+	if len(tools) != 9 {
+		t.Fatalf("want exactly nine native tools: %d", len(tools))
 	}
 	for _, tool := range tools {
 		fields, exists := want[tool.ModelAlias]
@@ -47,6 +49,9 @@ func TestAllNativeSchemasContainOnlyBusinessParameters(t *testing.T) {
 		}
 		if property, ok := schema.Properties["kind"]; ok && !reflect.DeepEqual(property["enum"], []any{"knowledge", "experience"}) {
 			t.Fatal("knowledge kinds do not match the native domain")
+		}
+		if property, ok := schema.Properties["confirm"]; ok && property["type"] != "boolean" {
+			t.Fatal("forget confirmation must be an explicit boolean")
 		}
 	}
 	if len(want) != 0 {
