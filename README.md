@@ -2,7 +2,7 @@
 
 面向企业、组织和团队的 Bot 原生能力与治理平台。管理员管理人格、SOP、应用账号和运行范围；Bot 可以沉淀业务知识/经验，自建任务与提醒。成员通过 Slack 等外部应用交互，Bots 管理台负责配置、启停和审计。
 
-当前实现了知识与提醒的 MVP 主链：认证入站（签名 webhook 或内部 App 的 Socket Mode）、持久 inbox、五个原生工具、Chronotope 有限 run/耐久 timer、唯一 sender、回执/unknown 台账及管理员 API。G0 已使用真实 Bots 进程、PG 与 Chronotope 栈验证；G1 已在私有测试频道通过真实 Slack Socket Mode、真实模型、知识/提醒、等待中崩溃重启与跨会话 recall；G2 已用真实纠正轨迹、冻结 fixture、隔离配对和人工批准完成一次 SOP 改进并发布真实 Bot revision 2。仓库：[BingdiLotus/bots](https://github.com/BingdiLotus/bots)。阶段状态与证据见[开发进展](docs/MVP开发进展.md)；受控试用上线准备见[部署与试用](docs/部署与试用.md)；独立 private 新频道和 Docker trial Bot 已上线并通过 smoke；Slack scopes、unknown 人工处置、D1/D2/D3 及同窗口全栈恢复已验证（RTO 18.3s、RPO 0）。技术 P0 已完成；`v0.1.0-mvp` 已发布，单操作者 private trial 已签核（owner、数据范围、阈值、巡检与回滚），trial 运行 `/readyz` 和 `/metrics`；当前 private trial 已于 2026-10-21 12:35 提前结束并保存快照；正式团队扩员 deferred，新 trial 需重新签核并复核成员。下一期任务见[任务清单](docs/下一期任务清单.md)。
+当前实现了知识与提醒的 MVP 主链：认证入站（签名 webhook 或内部 App 的 Socket Mode）、持久 inbox、九个原生工具（知识、提醒、任务可见性与记忆治理）、Chronotope 有限 run/耐久 timer、唯一 sender、回执/unknown 台账及管理员 API。G0 已使用真实 Bots 进程、PG 与 Chronotope 栈验证；G1 已在私有测试频道通过真实 Slack Socket Mode、真实模型、知识/提醒、等待中崩溃重启与跨会话 recall；G2 已用真实纠正轨迹、冻结 fixture、隔离配对和人工批准完成一次 SOP 改进并发布真实 Bot revision 2。仓库：[BingdiLotus/bots](https://github.com/BingdiLotus/bots)。阶段状态与证据见[开发进展](docs/MVP开发进展.md)；受控试用上线准备见[部署与试用](docs/部署与试用.md)；独立 private 新频道和 Docker trial Bot 已上线并通过 smoke；Slack scopes、unknown 人工处置、D1/D2/D3 及同窗口全栈恢复已验证（RTO 18.3s、RPO 0）。技术 P0 已完成；`v0.1.0-mvp` 已发布，单操作者 private trial 已签核（owner、数据范围、阈值、巡检与回滚），trial 运行 `/readyz` 和 `/metrics`；当前 private trial 已于 2026-10-21 12:35 提前结束并保存快照；正式团队扩员 deferred，新 trial 需重新签核并复核成员。下一期任务见[任务清单](docs/下一期任务清单.md)。
 
 管理员可通过 `/admin` 管理工作配置、启停、知识、任务、回执和审计。页面直接嵌入 Go 服务；成员仍在 Slack 中与 Bot 交互。管理页与一次 SOP 改进的完整验收分别记录，尚未用界面可用替代实际改进结果。
 
@@ -72,7 +72,7 @@ docs/                  产品设计与研究
 
 | 文档 | 权威范围 |
 |---|---|
-| [MVP 实施方案](./docs/MVP设计.md) | 唯一产品主路径、八类记录、五个工具、G0/G1/G2 与实施验收 |
+| [MVP 实施方案](./docs/MVP设计.md) | 唯一产品主路径、八类记录、原生工具、G0/G1/G2 与实施验收 |
 | [Chronotope 集成与职责边界](./docs/Chronotope与Bingdi-Bots职责边界.md) | Bots、执行 infra 与外部应用逐对象分权 |
 | [持久身份与非模型 RSI](./docs/持久Agent身份与非模型RSI设计.md) | 原生资产/工作与后续改进能力，非 MVP 全量前置 |
 | [承诺原语](./docs/承诺原语设计.md) | 原生责任的历史依据/后续设计；MVP 先用 Task 字段 |

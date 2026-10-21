@@ -56,11 +56,12 @@
 
 - 2026-10-21：可观测性最小实现（PR #2，main CI `39515748812`）：`/metrics` 暴露 `bots_up/ready`、inbox/task/delivery 状态计数和 active knowledge；`scripts/trial-health.sh` 巡检 ready/unknown/rejected。镜像 `bingdi-bots:mvp-20261021-metrics` 已部署 trial，metrics healthy/readyz 200，trial-health 退出 0。未包含文本、token 或 Slack ID；阈值/owner 仍待确认。详见[试用可观测性证据](evidence/试用可观测性-2026-10-21.md)。
 
+- 2026-10-21：M1/M2 实现。新增只读 `list_tasks`/`list_reminders`（当前 tenant/bot/channel scope，未完成/未取消任务，按 due_at 排序，不写 operation receipt/audit）和 `list_memories`（当前 scope 有效显式知识）；新增 `forget_memory`（必须 confirm、CAS expected_revision、只停用当前 scope、写 `knowledge_forgotten` audit，响应丢失可重放）。自动记忆仍关闭。原生工具从 5 个增加到 9 个；PG 回归覆盖 scope 隔离、空结果、只读无 receipt、确认/陈旧 revision/跨 scope、audit 去重。当前 trial 已停止，真实 Slack smoke 待新 trial。新增工具需要新 bot revision/runtime agent，旧 thread 保留原工具集。
 - 2026-10-21：发布 `v0.1.0-mvp` 的 release notes 已加入 `docs/releases/v0.1.0-mvp.md`；tag 指向包含这些 notes 的 main 提交。
 
 运行配置、Socket Mode/webhook 两种 Slack 入口、管理 API 与分层验证见[运行与验收](运行与验收.md)；真实 G1 结果、失败轨迹和边界见[真实 Slack 与 Socket 验收](evidence/MVP-真实Slack与Socket-2026-10-20.md)。真实 workspace、测试频道和凭据引用只保存在本地 gitignored `configs/bot.yaml` 与 `.env*`，不写入仓库；更换 workspace/频道/账号需要新 Bot 或明确的开发重建。
 
-G1/G2 的代码与真实纵向门禁已通过；独立 trial 频道/tenant/Docker Bot 已上线，全栈演练知识已停用，主线 smoke 已 confirmed。**MVP 主链和 P0 技术项完成**；受控试用的成员范围、opt-in、指标和正式启动时间尚未确认。Slack scopes、unknown 人工处置、权限撤回演练、Docker 容器、独立 trial tenant/频道、D1/D2/D3 和同窗口全栈恢复均已完成；systemd 模板为可选，未在 Linux 执行。清单与未完成项见[部署与试用](部署与试用.md)和[P0 证据](evidence/P0-上线准备-2026-10-20.md)。
+G1/G2 的代码与真实纵向门禁已通过；独立 trial 频道/tenant/Docker Bot 已上线，全栈演练知识已停用，主线 smoke 已 confirmed。**MVP 主链和 P0 技术项完成**；单操作者 trial 已于 2026-10-21 12:35 结束；M1/M2 已实现，真实 Slack smoke 需新 trial；正式团队扩员 deferred。Slack scopes、unknown 人工处置、权限撤回演练、Docker 容器、独立 trial tenant/频道、D1/D2/D3 和同窗口全栈恢复均已完成；systemd 模板为可选，未在 Linux 执行。清单与未完成项见[部署与试用](部署与试用.md)和[P0 证据](evidence/P0-上线准备-2026-10-20.md)。
 
 真实 Bot 仍是一个 workspace/测试频道、一个模型和一个渠道；SOP 只在一条目标 case 和四个 guard 上验证，且有两处 checker 误报已如实保留。后续真实使用反馈若显示候选造成回退，按新 revision 发布 baseline 内容（不倒退 revision）并记录；未来改进继续按[SOP 改进验收](SOP改进验收.md)冻结来源、fixture 和人工决议，不建设自动提案/评测平台。
 

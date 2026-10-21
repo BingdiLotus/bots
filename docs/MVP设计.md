@@ -27,7 +27,7 @@
 | 管理 | G0/G1 用配置文件和受权 API；G2 再补一页配置/启停/知识/任务/receipt 管理视图，不先做完整控制台 |
 | 账号 | 管理员预先绑定 Slack token/signing secret；不做应用市场、成员 OAuth 或多身份委派 |
 | Agent | 一个现有可用模型、一份 SOP、一个 Go loop + Python provider；有限 steps/token/时间/任务数上限 |
-| 工具 | `remember`、`recall`、`create_reminder`、`update_reminder`、`cancel_reminder`；JSON Schema 固定，先走一个 typed HTTP bridge |
+| 工具 | `remember`、`recall`、`create_reminder`、`update_reminder`、`cancel_reminder`；JSON Schema 固定，先走一个 typed HTTP bridge。M1/M2 在 MVP 之后追加只读 `list_tasks`、`list_reminders`、`list_memories` 和带确认的 `forget_memory`，不改变原五工具语义 |
 | 回复 | 模型不直接发 Slack。Bots 读取运行终态后创建一次最终回复；提醒到点也由同一个 Bots sender 发送 |
 | 知识 | Bots 直接建 scoped PG 表，支持新知识/经验、来源、修订与停用；scope + 最近/关键词检索，无向量检索前置 |
 | 原生工作 | 一张 BotTask 表表达提醒目标、简单计划、承诺内容/验收及单次调度字段；不先拆 Plan/DAG/Schedule/Commitment 引擎 |
