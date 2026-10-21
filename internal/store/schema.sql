@@ -37,6 +37,14 @@ CREATE TABLE IF NOT EXISTS bots.knowledge (
  created_at timestamptz NOT NULL DEFAULT now(), FOREIGN KEY(tenant_id,bot_id) REFERENCES bots.bots(tenant_id,bot_id)
 );
 CREATE INDEX IF NOT EXISTS knowledge_scope ON bots.knowledge(tenant_id,bot_id,scope_id,created_at DESC) WHERE active;
+CREATE TABLE IF NOT EXISTS bots.memory_confirmations (
+ token text PRIMARY KEY, tenant_id text NOT NULL, bot_id text NOT NULL, scope_id text NOT NULL,
+ knowledge_id text NOT NULL, knowledge_revision integer NOT NULL, requested_command_id text NOT NULL,
+ expires_at timestamptz NOT NULL, used_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ FOREIGN KEY(tenant_id,bot_id) REFERENCES bots.bots(tenant_id,bot_id)
+);
+CREATE INDEX IF NOT EXISTS memory_confirmations_expiry ON bots.memory_confirmations(expires_at);
 CREATE TABLE IF NOT EXISTS bots.tasks (
  id text PRIMARY KEY, tenant_id text NOT NULL, bot_id text NOT NULL, scope_id text NOT NULL,
  origin_command_id text NOT NULL, reminder_slot integer NOT NULL DEFAULT 0,
