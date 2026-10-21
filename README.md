@@ -2,7 +2,7 @@
 
 面向企业、组织和团队的 Bot 原生能力与治理平台。管理员管理人格、SOP、应用账号和运行范围；Bot 可以沉淀业务知识/经验，自建任务与提醒。成员通过 Slack 等外部应用交互，Bots 管理台负责配置、启停和审计。
 
-当前实现了知识与提醒的 MVP 主链：认证入站（签名 webhook 或内部 App 的 Socket Mode）、持久 inbox、五个原生工具、Chronotope 有限 run/耐久 timer、唯一 sender、回执/unknown 台账及管理员 API。G0 已使用真实 Bots 进程、PG 与 Chronotope 栈验证；G1 已在私有测试频道通过真实 Slack Socket Mode、真实模型、知识/提醒、等待中崩溃重启与跨会话 recall；G2 已用真实纠正轨迹、冻结 fixture、隔离配对和人工批准完成一次 SOP 改进并发布真实 Bot revision 2。仓库：[BingdiLotus/bots](https://github.com/BingdiLotus/bots)。阶段状态与证据见[开发进展](docs/MVP开发进展.md)；受控试用上线准备见[部署与试用](docs/部署与试用.md)；独立 private 新频道和 Docker trial Bot 已上线并通过 smoke；Slack scopes、unknown 人工处置、D1/D2/D3 及同窗口全栈恢复已验证（RTO 18.3s、RPO 0）。技术 P0 已完成；systemd 为可选项，试用成员/owner/指标/回滚待确认。
+当前实现了知识与提醒的 MVP 主链：认证入站（签名 webhook 或内部 App 的 Socket Mode）、持久 inbox、五个原生工具、Chronotope 有限 run/耐久 timer、唯一 sender、回执/unknown 台账及管理员 API。G0 已使用真实 Bots 进程、PG 与 Chronotope 栈验证；G1 已在私有测试频道通过真实 Slack Socket Mode、真实模型、知识/提醒、等待中崩溃重启与跨会话 recall；G2 已用真实纠正轨迹、冻结 fixture、隔离配对和人工批准完成一次 SOP 改进并发布真实 Bot revision 2。仓库：[BingdiLotus/bots](https://github.com/BingdiLotus/bots)。阶段状态与证据见[开发进展](docs/MVP开发进展.md)；受控试用上线准备见[部署与试用](docs/部署与试用.md)；独立 private 新频道和 Docker trial Bot 已上线并通过 smoke；Slack scopes、unknown 人工处置、D1/D2/D3 及同窗口全栈恢复已验证（RTO 18.3s、RPO 0）。技术 P0 已完成；`v0.1.0-mvp` 已发布，单操作者 private trial 已签核（owner、数据范围、阈值、巡检与回滚），trial 运行 `/readyz` 和 `/metrics`；正式团队试用的新增成员、告警渠道和扩员仍待确认。
 
 管理员可通过 `/admin` 管理工作配置、启停、知识、任务、回执和审计。页面直接嵌入 Go 服务；成员仍在 Slack 中与 Bot 交互。管理页与一次 SOP 改进的完整验收分别记录，尚未用界面可用替代实际改进结果。
 
@@ -50,7 +50,7 @@ make build
 
 参见 [.env.example](./.env.example)。服务不自动读取 `.env`，需由 shell/部署环境导出。seed 仅存凭据引用；后台 sender 才解析实际渠道 token，模型不能指定频道或回调地址。
 
-已提供 [Dockerfile](./Dockerfile) 和含 PostgreSQL 事务测试的 [CI](./.github/workflows/ci.yml)。本机 `make check`、G0、真实模型＋sink、管理页浏览器 QA 及容器构建/只读 smoke 通过；真实 Slack 与完整 SOP 改进仍待验收，详见开发进展。
+已提供 [Dockerfile](./Dockerfile) 和含 PostgreSQL 事务测试的 [CI](./.github/workflows/ci.yml)。`make check`、G0/G1/G2、真实模型+Slack、P0、D1/D2/D3、`v0.1.0-mvp`、管理页和容器 smoke 已通过；真实 Slack/G2 不再是待验收项。完整多 Bot、生产 HA/PITR 不在 MVP 范围内，详见开发进展。
 
 ## 代码与设计入口
 
@@ -68,7 +68,7 @@ test/                   实际进程联调，只有模型和渠道 provider 使�
 docs/                  产品设计与研究
 ```
 
-下一发布门仍是一个组织 Bot、一个 Slack 账号、一个 harness：**记住信息 → 自建提醒 → 等待中重启 → 发送并保存真实 Slack 回执**。本地 sink 的确认只验证技术路径，不能替代真实渠道。
+`v0.1.0-mvp` 已发布：一个组织 Bot、一个 Slack 账号、一个 harness 的“记住信息 → 自建提醒 → 等待中重启 → 发送并保存真实 Slack 回执”已验收。下一阶段是单操作者试用反馈、正式团队治理和生产硬化，不是重新验收主链。
 
 | 文档 | 权威范围 |
 |---|---|
