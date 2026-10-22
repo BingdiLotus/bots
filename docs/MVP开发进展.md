@@ -69,3 +69,5 @@ G1/G2 的代码与真实纵向门禁已通过；独立 trial 频道/tenant/Docke
 ## 完成审计
 
 完成前逐项核对主合同 §6 的验收矩阵、G0/G1/G2、当前代码与运行证据。G0 使用真实 PG/fake provider 覆盖故障与隔离矩阵；G1 使用真实 Slack 纵向路径；G2 完成一次真实来源、隔离配对、人工批准和真实 thread 复验。G1 的十次投递、unknown/迟到 receipt、改期/取消竞态、限额和跨 tenant 行仍由 G0/PG/fake 回归覆盖，未在真实 Slack 逐项注入；G2 的 checker 误报和单次改进边界保留在证据中。P0 技术项已完成：Slack scopes、unknown 处置、权限撤回、Docker trial、独立 tenant/频道、D1/D2/D3 和同窗口全栈恢复；剩余 trial owner/opt-in/指标/回滚确认与可选 systemd。不将部分骨架、fake 通过、单次 SOP 改进、G1 结果或部分 P0 工作改写为完整生产发布。
+
+- 2026-10-22：M1/M2 短 trial 结束（11:58）。最终 39 inbox/4 completed tasks/28 deliveries（26 confirmed、2 rejected、0 unknown）、active knowledge 1（BLUE-9 未被删除）。两步 forget 的 request/token 路径真实验证；confirm 未在 10 分钟 TTL 内完成，且 2 条最终回复 transport_error 被解析 rejected。快照 `backups/m1m2-trial-20261022-115816`（dump SHA-256 `2cb3bc30…`）。容器 exited、8090 free、launchd 卸载。详见[M1/M2 短 trial](evidence/M1-M2-短trial-2026-10-22.md)。
